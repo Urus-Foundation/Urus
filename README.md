@@ -347,7 +347,9 @@ run_tests.bat ..\compiler\urusc.exe
 │   └── decisions/       # Architectural Decision Records
 ├── SPEC.md              # Language specification
 ├── CHANGELOG.md         # Version history
-├── CLAUDE.md            # AI development guide
+├── CODE_OF_CONDUCT.md   # Community guidelines
+├── CONTRIBUTING.md      # Contribution guide
+├── SECURITY.md          # Security policy
 └── LICENSE              # Apache 2.0
 ```
 

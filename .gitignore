@@ -23,5 +23,7 @@ compiler/err.log
 Thumbs.db
 .DS_Store
 
-# Claude
+# Claude / AI
 .claude/
+.qoder/
+
