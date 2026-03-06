@@ -1,4 +1,5 @@
 #include "sema.h"
+#include "linter.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -7,6 +8,13 @@
 // ============================================================
 // Symbol & Scope
 // ============================================================
+
+void analyze_semantics(ASTNode* root) {
+    // ... logika semantic analysis yang sudah ada ...
+
+    // Tambahkan baris ini di akhir fungsi
+    run_urus_linter(root);
+}
 
 typedef struct {
     char *name;
