@@ -113,7 +113,7 @@ If you're adding a new language feature, follow this checklist:
 6. `compiler/src/codegen.c` — Generate C code
 7. `compiler/include/urus_runtime.h` — Add runtime support (if needed)
 8. `tests/` — Add test cases
-9. `documentation/SPEC.md` — Update language spec
+9. `SPEC.md` — Update language spec
 10. `examples/` — Add example program
 
 See the [Development Guide](./documentation/development-guide/) for more details.
@@ -144,7 +144,7 @@ documentation/  # Full project docs
 ## Need Help?
 
 - Read the [Documentation](./documentation/)
-- Check the [Language Spec](./SPEC.md)
+- Check the [Language Spec](SPEC.md)
 - Look at [Examples](./examples/) for syntax reference
 - Open an issue if you're stuck
 
