@@ -1,9 +1,11 @@
 cmake_minimum_required(VERSION 3.10)
-
 project(UrusCompiler VERSION 1.0.1 LANGUAGES C)
 
+set(PROJECT_VERSION_TAGS "(F)-Fixed")
 set(CMAKE_C_STANDARD 11) # -std=c11
 set(CMAKE_C_STANDARD_REQUIRED ON)
+
+configure_file(config.h.in config.h)
 
 if(MSVC)
     add_compile_options(/W4)
@@ -38,6 +40,8 @@ set(SOURCES
 )
 
 add_executable(urusc ${SOURCES} ${URUS_RUNTIME_EMBEDDED})
+
+target_include_directories(urusc PRIVATE "${CMAKE_CURRENT_BINARY_DIR}") # -I<BUILD DIRECTORIES> (example for config.h by config.h.in)
 target_include_directories(urusc PRIVATE include) # -Iinclude
 
 # -lm for non-windows
