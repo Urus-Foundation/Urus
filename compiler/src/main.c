@@ -19,6 +19,7 @@
 #  include <limits.h>
 #endif
 
+#include "config.h"
 #include "util.h"
 #include "lexer.h"
 #include "parser.h"
@@ -191,10 +192,10 @@ static void print_tokens(Token *tokens, int count) {
     printf("\n");
 }
 
-void show_help(void) {
-    static const char *help =
-        "URUS Compiler v1.0.1(F)\n\n"
-        "usage: urusc <file.urus> [options]\n\n"
+static void show_help(char *progname) {
+    printf(
+        "URUS Compiler, version "URUS_COMPILER_VERSION"\n"
+        "usage: %s [options] file\n\n"
         "Rust-like safety with Python-like simplicity, transpiling to C11\n\n"
         "Options:\n"
         "  --tokens    Display Lexer tokens\n"
@@ -202,40 +203,63 @@ void show_help(void) {
         "  --emit-c    Print generated C code to stdout\n"
         "  -o <file>   Specify output executable name (default to: a.exe)\n\n"
         "Example:\n"
-        "  `urusc main.urus -o app` \n";
+        "  %s main.urus -o app \n", progname, progname
+    );
+}
 
-    printf("%s", help);
+static void show_version(void) {
+    printf(
+        "URUS Compiler, version "URUS_COMPILER_VERSION"\n"
+        "Copyright (C) 2026 Urus Foundation.\n"
+        "License: Apache License 2.0 <http://www.apache.org>\n"
+        "Homepage: https://github.com/Urus-Foundation/Urus\n\n"
+        "This is free software: you are free to change and redistribute it.\n"
+        "There is NO WARRANTY, to the extent permitted by law.\n"
+    );
 }
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        show_help();
+        fprintf(stderr, "%s: error: input file required\n", argv[0]);
+        show_help(argv[0]);
         return 1;
     }
 
-    /* Handle --help and --version before assuming argv[1] is a file */
-    for (int i = 1; i < argc; i++) {
-        if (strcmp(argv[i], "--help") == 0 || strcmp(argv[i], "-h") == 0) {
-            show_help();
-            return 0;
-        }
-        if (strcmp(argv[i], "--version") == 0 || strcmp(argv[i], "-v") == 0) {
-            printf("URUS Compiler v1.0.1(F)\n");
-            return 0;
-        }
-    }
-
-    const char *path = argv[1];
+    const char *path = NULL;
     bool show_tokens = false;
     bool show_ast = false;
     bool emit_c = false;
     const char *output = NULL;
 
-    for (int i = 2; i < argc; i++) {
-        if (strcmp(argv[i], "--tokens") == 0) show_tokens = true;
-        else if (strcmp(argv[i], "--ast") == 0) show_ast = true;
-        else if (strcmp(argv[i], "--emit-c") == 0) emit_c = true;
-        else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) output = argv[++i];
+    for (int i = 1; i < argc; i++) {
+        if (argv[i][0] == '-') {
+            if ((strcmp(argv[i], "--help") == 0) || (strcmp(argv[i], "-h") == 0)) {
+                show_help(argv[0]);
+                return 0;
+            }
+            else if ((strcmp(argv[i], "--version") == 0) || (strcmp(argv[i], "-v") == 0)) {
+                show_version();
+                return 0;
+            }
+            else if (strcmp(argv[i], "--tokens") == 0) show_tokens = true;
+            else if (strcmp(argv[i], "--ast") == 0) show_ast = true;
+            else if (strcmp(argv[i], "--emit-c") == 0) emit_c = true;
+            else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc) output = argv[++i];
+            else {
+                fprintf(stderr, "%s: error: invalid option %s\n", argv[0], argv[i]);
+                return 1;
+            }
+        }
+        else {
+            // TODO: Create support for files... input array,  by making objects before compilation
+            path = argv[i];
+        }
+    }
+
+    if (!path) {
+        fprintf(stderr, "%s: error: input file required\n", argv[0]);
+        show_help(argv[0]);
+        return 1;
     }
 
     size_t len;
