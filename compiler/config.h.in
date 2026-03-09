@@ -1,0 +1,6 @@
+#ifndef CONFIG_H
+#define CONFIG_H
+
+#define URUS_COMPILER_VERSION "@PROJECT_VERSION@ @PROJECT_VERSION_TAGS@"
+
+#endif
