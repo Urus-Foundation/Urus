@@ -1,4 +1,4 @@
-# Catatan Pengembangan V0.2/2(F) "Fixed"
+# Catatan Rasya #3 — V0.2/2(F) "Fixed"
 
 **Tanggal:** 9 Maret 2026
 **Oleh:** Rasya Andrean
@@ -23,13 +23,13 @@ Terakhir PR #7. Ini soal **error reporting**. Sebelumnya kalau ada error, pesan 
 
 ---
 
-## Masalah yang Ditemukan Waktu Testing
+## Masalah yang Gue Temuin Waktu Testing
 
-Setelah semua PR itu di-merge, mulai testing buat rilis V0.2/2. Dan ternyata banyak yang pecah, terutama di Windows. Ini wajar karena John-fried develop-nya di Linux, jadi beberapa hal yang jalan mulus di sana ternyata bermasalah di Windows.
+Nah, setelah semua PR itu di-merge, gue mulai testing buat rilis V0.2/2. Dan ternyata... banyak yang pecah, terutama di Windows. Ini wajar sih karena John-fried develop-nya di Linux, jadi beberapa hal yang jalan mulus di sana ternyata bermasalah di Windows.
 
 ### 1. `error.c` pakai `getline()` — nggak ada di Windows
 
-Fungsi `getline()` itu POSIX, dan MSVC nggak punya. Waktu build pakai Visual Studio langsung error linking: `unresolved external symbol getline`. Solusinya diganti pakai `fgets()` yang portable dan kerja di semua platform. Sekalian diperbaiki juga memory management-nya — versi lama pakai `malloc`/`free` buat buffer, sekarang pakai stack buffer `char[4096]` yang lebih simpel dan nggak perlu free.
+Fungsi `getline()` itu POSIX, dan MSVC nggak punya. Waktu build pakai Visual Studio langsung error linking: `unresolved external symbol getline`. Solusinya gue ganti pakai `fgets()` yang portable dan kerja di semua platform. Sekalian gue perbaiki juga memory management-nya — versi lama pakai `malloc`/`free` buat buffer, sekarang pakai stack buffer `char[4096]` yang lebih simpel dan nggak perlu free.
 
 ### 2. Generated C file corrupt di Windows (double CRLF)
 
@@ -37,7 +37,7 @@ Ini bug yang lumayan tricky. Jadi ceritanya, `urus_runtime.h` di Windows disimpa
 
 ### 3. `--help` dan `--version` dianggap nama file
 
-Logika parsing argumen di `main.c` langsung anggap `argv[1]` itu path file. Jadi kalau user ketik `urusc --help`, compiler malah coba buka file bernama `--help` dan keluar error "cannot open file '--help'". Fix-nya ditambahin loop yang scan semua argumen dulu sebelum assume argv[1] itu file. Sekalian ditambahin juga flag `--version` / `-v` yang belum ada sebelumnya.
+Logika parsing argumen di `main.c` langsung anggap `argv[1]` itu path file. Jadi kalau user ketik `urusc --help`, compiler malah coba buka file bernama `--help` dan keluar error "cannot open file '--help'". Fix-nya gue tambahin loop yang scan semua argumen dulu sebelum assume argv[1] itu file. Sekalian gue tambahin juga flag `--version` / `-v` yang belum ada sebelumnya.
 
 ### 4. GCC nggak bisa nemuin `cc1` di Windows
 
@@ -45,17 +45,17 @@ Yang ini agak annoying. Compiler kita cari GCC di path hardcoded kayak `C:/msys6
 
 ### 5. Flag `-I include` masih dipakai padahal udah nggak perlu
 
-Setelah PR #6 bikin compiler standalone (runtime di-embed ke generated C), flag `-I include` yang dikirim ke GCC jadi nggak berguna. Lebih parah lagi, path yang dibangun (`build/Release/include`) bahkan nggak exist. Dihapus semua logika `include_dir` dan flag `-I` dari invokasi GCC.
+Setelah PR #6 bikin compiler standalone (runtime di-embed ke generated C), flag `-I include` yang dikirim ke GCC jadi nggak berguna. Lebih parah lagi, path yang dibangun (`build/Release/include`) bahkan nggak exist. Gue hapus semua logika `include_dir` dan flag `-I` dari invokasi GCC.
 
 ### 6. MSVC warnings soal `strdup`
 
-Build pakai MSVC kasih banyak warning: "strdup deprecated, use _strdup". Ini karena MSVC pengen kita pakai versi dengan underscore prefix. Daripada ganti semua `strdup` di codebase (yang bakal break di GCC/Linux), ditambahin `_CRT_SECURE_NO_WARNINGS` dan `_CRT_NONSTDC_NO_DEPRECATE` di CMakeLists.txt khusus untuk MSVC.
+Build pakai MSVC kasih banyak warning: "strdup deprecated, use _strdup". Ini karena MSVC pengen kita pakai versi dengan underscore prefix. Daripada ganti semua `strdup` di codebase (yang bakal break di GCC/Linux), gue tambahin `_CRT_SECURE_NO_WARNINGS` dan `_CRT_NONSTDC_NO_DEPRECATE` di CMakeLists.txt khusus untuk MSVC.
 
 ---
 
 ## Hasil Test Akhir
 
-Setelah semua fix di atas, rebuild dari nol dan jalanin semua test:
+Setelah semua fix di atas, gue rebuild dari nol dan jalanin semua test:
 
 - **10 test cases** di `tests/run/` — semua PASS, output sesuai `.expected`
 - **8 contoh program** di `examples/` — semua compile dan jalan normal
@@ -73,7 +73,7 @@ Total **11 file** yang kena perubahan di versi ini:
 | File | Apa yang Berubah |
 |------|-----------------|
 | `CHANGELOG.md` | Tambah section V0.2/2(F) lengkap |
-| `README.md` | Rewrite total — tata letak baru, struktur folder akurat, URL repo updated |
+| `README.md` | Update versi, stats, URL repo ke Urus-Foundation, roadmap |
 | `SPEC.md` | Update version header |
 | `CONTRIBUTING.md` | Build instructions ganti ke CMake |
 | `SECURITY.md` | Tambah V0.2/2 ke supported versions |
@@ -88,7 +88,7 @@ Total **11 file** yang kena perubahan di versi ini:
 
 ## Pelajaran
 
-Kalau ada satu hal yang dipelajari dari rilis ini: **selalu test di semua platform target**. Banyak bug di atas nggak bakal ketemu kalau cuma test di Linux. Windows punya behavior beda di soal line ending, PATH resolution, dan fungsi POSIX. Cross-platform itu bukan cuma soal "compile di mana-mana", tapi juga soal "jalan bener di mana-mana".
+Kalau ada satu hal yang gue pelajari dari rilis ini: **selalu test di semua platform target**. Banyak bug di atas nggak bakal ketemu kalau cuma test di Linux. Windows punya behavior beda di soal line ending, PATH resolution, dan fungsi POSIX. Cross-platform itu bukan cuma soal "compile di mana-mana", tapi juga soal "jalan bener di mana-mana".
 
 Juga, bikin compiler standalone (embed runtime ke binary) itu keputusan bagus. Sebelumnya user harus manage dua file (compiler + runtime header), sekarang cukup satu file executable. Lebih gampang distribute, lebih gampang install.
 
