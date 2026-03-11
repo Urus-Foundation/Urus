@@ -120,7 +120,7 @@ fn add(a: int, b: int): int {
     return a + b;
 }
 
-fn greet(name: str) {
+fn greet(name: str = "Anonymous") {
     print(f"Hello {name}!");
 }
 ```
