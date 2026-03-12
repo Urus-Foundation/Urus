@@ -198,10 +198,12 @@ static void show_help(char *progname) {
         "usage: %s [options] file\n\n"
         "Rust-like safety with Python-like simplicity, transpiling to C11\n\n"
         "Options:\n"
+        "  --help      Show help message\n"
+        "  --version   Show compiler message\n"
         "  --tokens    Display Lexer tokens\n"
         "  --ast       Display the Abstract Syntax Tree (AST)\n"
         "  --emit-c    Print generated C code to stdout\n"
-        "  -o <file>   Specify output executable name (default to: a.exe)\n\n"
+        "  -o <file>   Specify output executable name (default: a.exe)\n\n"
         "Example:\n"
         "  %s main.urus -o app \n", progname, progname
     );
@@ -220,7 +222,6 @@ static void show_version(void) {
 
 int main(int argc, char **argv) {
     if (argc < 2) {
-        fprintf(stderr, "%s: error: input file required\n", argv[0]);
         show_help(argv[0]);
         return 1;
     }
