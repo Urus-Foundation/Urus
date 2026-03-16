@@ -262,7 +262,7 @@ static AstType *check_expr(Sema *ctx, AstNode *node) {
         }
 
         if (node->as.call.callee->kind != NODE_IDENT) {
-            sema_error(ctx, &node->tok, "callee must be a function name");
+            sema_error(ctx, &node->as.call.callee->tok, "callee must be a function name");
             for (int i = 0; i < node->as.call.arg_count; i++)
                 check_expr(ctx, node->as.call.args[i]);
             return set_type(node, ast_type_simple(TYPE_VOID));
@@ -270,20 +270,20 @@ static AstType *check_expr(Sema *ctx, AstNode *node) {
 
         const char *fn_name = node->as.call.callee->as.ident.name;
         Symbol *sym = scope_lookup(ctx->current, fn_name);
-        sym->is_referenced = true;
         if (!sym) {
-            sema_error(ctx, &node->tok, "undefined function '%s'", fn_name);
+            sema_error(ctx, &node->as.call.callee->tok, "undefined function '%s'", fn_name);
             for (int i = 0; i < node->as.call.arg_count; i++)
                 check_expr(ctx, node->as.call.args[i]);
             return set_type(node, ast_type_simple(TYPE_VOID));
         }
         if (!sym->is_fn) {
-            sema_error(ctx, &node->tok, "'%s' is not a function", fn_name);
+            sema_error(ctx, &node->as.call.callee->tok, "'%s' is not a function", fn_name);
             for (int i = 0; i < node->as.call.arg_count; i++)
                 check_expr(ctx, node->as.call.args[i]);
             return set_type(node, ast_type_simple(TYPE_VOID));
         }
 
+        sym->is_referenced = true;
         int min_args = 0; //minimal arguments (argument with default value will not counted)
         for (int i = 0; i < sym->param_count; i++) {
             if (sym->params[i].default_value == NULL) {
@@ -292,7 +292,7 @@ static AstType *check_expr(Sema *ctx, AstNode *node) {
         }
 
         if (node->as.call.arg_count < min_args || node->as.call.arg_count > sym->param_count) {
-            sema_error(ctx, &node->tok, "'%s' expects %d arguments, got %d",
+            sema_error(ctx, &node->as.call.callee->tok, "'%s' expects %d arguments, got %d",
                        fn_name, sym->param_count, node->as.call.arg_count);
         }
 
@@ -301,7 +301,7 @@ static AstType *check_expr(Sema *ctx, AstNode *node) {
             if (sym->param_count > 0 && i < sym->param_count && sym->params) {
                 if (!ast_types_equal(at, sym->params[i].type)) {
                     if (sym->params[i].type && sym->params[i].type->kind != TYPE_VOID) {
-                        sema_error(ctx, &node->tok,
+                        sema_error(ctx, &node->as.call.args[i]->tok,
                                    "argument %d of '%s': expected '%s', got '%s'",
                                    i + 1, fn_name,
                                    ast_type_str(sym->params[i].type),
@@ -323,8 +323,6 @@ static AstType *check_expr(Sema *ctx, AstNode *node) {
                 if (sym->params[i].default_value != NULL) {
                     new_args[i] = sym->params[i].default_value;
                     new_args[i]->ref_count++;
-                } else {
-                    sema_error(ctx, &node->tok, "Missing argument for parameter '%s'", sym->params[i].name);
                 }
             }
 
