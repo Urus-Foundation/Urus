@@ -1,21 +1,21 @@
 ---
 name: Feature Request
-about: Ajukan fitur baru untuk URUS
+about: Propose a feature for URUS
 title: "[Feature] "
 labels: enhancement
 assignees: ''
 ---
 
-## Deskripsi Fitur
-Jelaskan fitur yang diinginkan.
+## Feature Description
+Describe the feature you would like to see.
 
-## Motivasi
-Kenapa fitur ini dibutuhkan? Problem apa yang diselesaikan?
+## Motivation
+Why is this feature needed? What problem does it solve?
 
-## Contoh Syntax (jika relevan)
+## Example Syntax (if relevant)
 ```urus
-// contoh penggunaan fitur yang diusulkan
+// Example usage of proposed feature
 ```
 
-## Alternatif
-Apakah ada workaround atau alternatif lain?
+## Alternatives
+Are there any workarounds or alternative solutions?

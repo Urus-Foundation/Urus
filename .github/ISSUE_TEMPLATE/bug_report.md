@@ -1,33 +1,33 @@
 ---
 name: Bug Report
-about: Laporkan bug yang kamu temukan
+about: Report a bug you found
 title: "[Bug] "
 labels: bug
 assignees: ''
 ---
 
-## Deskripsi
-Jelaskan bug yang ditemukan.
+## Description
+Describe the bug you encountered.
 
-## Langkah Reproduksi
+## Steps to Reproduce
 1. ...
 2. ...
 3. ...
 
 ## Expected Behavior
-Apa yang seharusnya terjadi.
+What should happened.
 
 ## Actual Behavior
-Apa yang sebenarnya terjadi.
+What actually happened.
 
-## Kode (jika relevan)
+## Code (if relevant)
 ```urus
-// kode yang menyebabkan bug
+// Code that cause the bug
 ```
 
 ## Error Message
 ```
-// paste error message di sini
+// Paste error message here
 ```
 
 ## Environment

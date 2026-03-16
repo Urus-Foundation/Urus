@@ -1,23 +1,23 @@
 ---
 name: Question / Help
-about: Tanya atau minta bantuan
+about: Ask a question or request assistance
 title: "[Question] "
 labels: question, help wanted
 assignees: ''
 ---
 
-## Pertanyaan
-Tulis pertanyaan kamu di sini.
+## Question
+Write your question here.
 
-## Apa yang Sudah Dicoba
-Jelaskan apa yang sudah kamu coba.
+## What I've tried
+Describe what you have already tried to solve the issue.
 
-## Kode (jika relevan)
+## Code (if relevant)
 ```urus
-// kode kamu di sini
+// your code here
 ```
 
-## Error Message (jika ada)
+## Error message (if any)
 ```
-// error message di sini
+// error messages here
 ```

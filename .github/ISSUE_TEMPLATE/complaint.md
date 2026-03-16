@@ -1,24 +1,24 @@
 ---
 name: Complaint / Feedback
-about: Sampaikan keluhan atau feedback
+about: Provide feedback or express a concern
 title: "[Feedback] "
 labels: feedback
 assignees: ''
 ---
 
-## Kategori
+## Category
 - [ ] Compiler crash
-- [ ] Error message tidak jelas
-- [ ] Dokumentasi kurang / salah
-- [ ] Build / instalasi bermasalah
-- [ ] Performa lambat
-- [ ] Lainnya
+- [ ] Unclear error message
+- [ ] Documentation missing / incorrect
+- [ ] Build / installation issues
+- [ ] Slow performance
+- [ ] Others
 
-## Deskripsi
-Jelaskan keluhan atau feedback kamu.
+## Description
+Please describe your feedback or complaint.
 
-## Saran Perbaikan
-Kalau ada saran, tulis di sini.
+## Suggestions for Improvements
+If you have any suggestions, please write them here.
 
 ## Environment
 - OS:
