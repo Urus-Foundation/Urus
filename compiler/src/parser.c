@@ -281,7 +281,7 @@ static AstNode *parse_primary(Parser *p) {
             }
             p->pos = saved;
         }
-        // Check for struct literal: Ident { field: val, ... } or Ident {}
+        // Check for struct literal: Ident { field: val, ... } or Ident {} or Ident { ..expr }
         if (check(p, TOK_LBRACE)) {
             int saved = p->pos;
             advance_tok(p); // skip {
@@ -292,6 +292,19 @@ static AstNode *parse_primary(Parser *p) {
                 n->as.struct_lit.name = name;
                 n->as.struct_lit.fields = NULL;
                 n->as.struct_lit.field_count = 0;
+                n->as.struct_lit.spread = NULL;
+                return n;
+            }
+            // Spread-only: Ident { ..expr }
+            if (check(p, TOK_DOTDOT)) {
+                advance_tok(p); // skip ..
+                AstNode *spread = parse_expr(p);
+                expect(p, TOK_RBRACE, "expected '}' after spread expression");
+                AstNode *n = ast_new(NODE_STRUCT_LIT, t);
+                n->as.struct_lit.name = name;
+                n->as.struct_lit.fields = NULL;
+                n->as.struct_lit.field_count = 0;
+                n->as.struct_lit.spread = spread;
                 return n;
             }
             if (check(p, TOK_IDENT)) {
@@ -303,7 +316,14 @@ static AstNode *parse_primary(Parser *p) {
                     n->as.struct_lit.name = name;
                     int cap = 4, count = 0;
                     FieldInit *fields = malloc(sizeof(FieldInit) * (size_t)cap);
+                    AstNode *spread = NULL;
                     do {
+                        // Check for spread: ..expr (must be last)
+                        if (check(p, TOK_DOTDOT)) {
+                            advance_tok(p); // skip ..
+                            spread = parse_expr(p);
+                            break;
+                        }
                         if (count >= cap) {
                             cap *= 2;
                             fields = realloc(fields, sizeof(FieldInit) * (size_t)cap);
@@ -318,6 +338,7 @@ static AstNode *parse_primary(Parser *p) {
                     expect(p, TOK_RBRACE, "expected '}' after struct literal");
                     n->as.struct_lit.fields = fields;
                     n->as.struct_lit.field_count = count;
+                    n->as.struct_lit.spread = spread;
                     return n;
                 }
                 p->pos = saved2;

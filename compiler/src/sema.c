@@ -413,10 +413,26 @@ static AstType *check_expr(Sema *ctx, AstNode *node) {
             sema_error(ctx, &node->tok, "unknown struct '%s'", name);
             for (int i = 0; i < node->as.struct_lit.field_count; i++)
                 check_expr(ctx, node->as.struct_lit.fields[i].value);
+            if (node->as.struct_lit.spread)
+                check_expr(ctx, node->as.struct_lit.spread);
             return set_type(node, ast_type_simple(TYPE_VOID));
         }
-        if (node->as.struct_lit.field_count != st->field_count) {
+        // Validate spread expression type
+        if (node->as.struct_lit.spread) {
+            AstType *spread_type = check_expr(ctx, node->as.struct_lit.spread);
+            if (spread_type->kind != TYPE_NAMED || strcmp(spread_type->name, name) != 0) {
+                sema_error(ctx, &node->tok, "spread expression must be of type '%s', got '%s'",
+                           name, ast_type_str(spread_type));
+            }
+        }
+        // Without spread, field count must match exactly
+        if (!node->as.struct_lit.spread && node->as.struct_lit.field_count != st->field_count) {
             sema_error(ctx, &node->tok, "struct '%s' has %d fields, got %d",
+                       name, st->field_count, node->as.struct_lit.field_count);
+        }
+        // With spread, explicit fields must not exceed struct field count
+        if (node->as.struct_lit.spread && node->as.struct_lit.field_count > st->field_count) {
+            sema_error(ctx, &node->tok, "struct '%s' has %d fields, got %d explicit fields with spread",
                        name, st->field_count, node->as.struct_lit.field_count);
         }
         for (int i = 0; i < node->as.struct_lit.field_count; i++) {

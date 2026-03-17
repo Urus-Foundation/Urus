@@ -303,10 +303,15 @@ void ast_print(AstNode *node, int ind) {
         break;
 
     case NODE_STRUCT_LIT:
-        printf("StructLit '%s' (%d fields)\n", node->as.struct_lit.name, node->as.struct_lit.field_count);
+        printf("StructLit '%s' (%d fields%s)\n", node->as.struct_lit.name, node->as.struct_lit.field_count,
+               node->as.struct_lit.spread ? " +spread" : "");
         for (int i = 0; i < node->as.struct_lit.field_count; i++) {
             indent(ind + 1); printf(".%s =\n", node->as.struct_lit.fields[i].name);
             ast_print(node->as.struct_lit.fields[i].value, ind + 2);
+        }
+        if (node->as.struct_lit.spread) {
+            indent(ind + 1); printf("..spread =\n");
+            ast_print(node->as.struct_lit.spread, ind + 2);
         }
         break;
 
@@ -491,6 +496,7 @@ void ast_free(AstNode *node) {
             ast_free(node->as.struct_lit.fields[i].value);
         }
         free(node->as.struct_lit.fields);
+        ast_free(node->as.struct_lit.spread);
         break;
     case NODE_ENUM_DECL:
         free(node->as.enum_decl.name);

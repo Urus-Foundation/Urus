@@ -420,13 +420,24 @@ static int gen_expr_pre(CodeBuf *buf, AstNode *node) {
         for (int i = 0; i < node->as.struct_lit.field_count; i++) {
             gen_expr_pre(buf, node->as.struct_lit.fields[i].value);
         }
+        if (node->as.struct_lit.spread) {
+            gen_expr_pre(buf, node->as.struct_lit.spread);
+        }
         int tmp = buf->tmp_counter++;
         node->_codegen_tmp = tmp;
         emit_indent(buf);
         emit(buf, "%s* _urus_st_%d = malloc(sizeof(%s));\n",
              node->as.struct_lit.name, tmp, node->as.struct_lit.name);
 
-        // Field assign
+        // Spread: copy all fields from source, then override explicit ones
+        if (node->as.struct_lit.spread) {
+            emit_indent(buf);
+            emit(buf, "*_urus_st_%d = *", tmp);
+            gen_expr(buf, node->as.struct_lit.spread);
+            emit(buf, "; // spread copy\n");
+        }
+
+        // Field assign (overrides spread fields if present)
         for (int i = 0; i < node->as.struct_lit.field_count; i++) {
             emit_indent(buf);
             emit(buf, "_urus_st_%d->%s = ", tmp, node->as.struct_lit.fields[i].name);

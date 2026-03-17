@@ -1,0 +1,27 @@
+struct Point {
+    x: float;
+    y: float;
+}
+
+struct Circle {
+    cx: float;
+    cy: float;
+    radius: float;
+}
+
+fn main(): void {
+    let p1: Point = Point { x: 1.0, y: 2.0 };
+
+    // Spread with field override
+    let p2: Point = Point { x: 10.0, ..p1 };
+    print(f"p2.x={p2.x} p2.y={p2.y}");
+
+    // Spread only (full copy)
+    let p3: Point = Point { ..p1 };
+    print(f"p3.x={p3.x} p3.y={p3.y}");
+
+    let c1: Circle = Circle { cx: 0.0, cy: 0.0, radius: 5.0 };
+    // Override two fields, spread one
+    let c2: Circle = Circle { cx: 3.0, cy: 4.0, ..c1 };
+    print(f"c2.cx={c2.cx} c2.cy={c2.cy} c2.radius={c2.radius}");
+}

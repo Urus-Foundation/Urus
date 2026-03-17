@@ -209,7 +209,7 @@ struct AstNode {
         struct { AstNode **elements; int count; } array_lit;
 
         // NODE_STRUCT_LIT
-        struct { char *name; FieldInit *fields; int field_count; } struct_lit;
+        struct { char *name; FieldInit *fields; int field_count; AstNode *spread; } struct_lit;
 
         // NODE_ENUM_DECL
         struct {
