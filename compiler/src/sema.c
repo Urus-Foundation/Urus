@@ -455,6 +455,7 @@ static AstType *check_expr(Sema *ctx, AstNode *node) {
                            name, node->as.struct_lit.fields[i].name);
             }
         }
+        st->is_referenced = true;
         return set_type(node, ast_type_named(name));
     }
 
