@@ -144,8 +144,9 @@ static Token lex_fstring(Lexer *l) {
 static Token lex_number(Lexer *l) {
     const char *start = l->source + l->pos;
     while (isdigit(peek(l))) advance(l);
-    if (peek(l) == '.' && isdigit(peek_next(l))) {
-        advance(l);
+    if (peek(l) == '.' && peek_next(l) != '.') {
+        // '.' followed by '.' is range operator (e.g. 0..10), not float
+        advance(l); // consume '.'
         while (isdigit(peek(l))) advance(l);
         return make_token(l, TOK_FLOAT_LIT, start, (size_t)(l->source + l->pos - start));
     }
