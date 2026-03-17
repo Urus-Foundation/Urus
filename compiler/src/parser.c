@@ -64,6 +64,17 @@ static char *tok_str_value(Token t) {
     return ast_strdup(t.start + 1, t.length - 2);
 }
 
+// Strip underscores from numeric literal for strtoll/strtod
+static char *tok_num_str(Token t) {
+    char *buf = malloc(t.length + 1);
+    size_t j = 0;
+    for (size_t i = 0; i < t.length; i++) {
+        if (t.start[i] != '_') buf[j++] = t.start[i];
+    }
+    buf[j] = '\0';
+    return buf;
+}
+
 // ---- Forward declarations ----
 static AstNode *parse_expr(Parser *p);
 static AstNode *parse_statement(Parser *p);
@@ -198,14 +209,14 @@ static AstNode *parse_primary(Parser *p) {
 
     if (match(p, TOK_INT_LIT)) {
         AstNode *n = ast_new(NODE_INT_LIT, t);
-        char *s = tok_str(t);
+        char *s = tok_num_str(t);
         n->as.int_lit.value = strtoll(s, NULL, 10);
         free(s);
         return n;
     }
     if (match(p, TOK_FLOAT_LIT)) {
         AstNode *n = ast_new(NODE_FLOAT_LIT, t);
-        char *s = tok_str(t);
+        char *s = tok_num_str(t);
         n->as.float_lit.value = strtod(s, NULL);
         free(s);
         return n;

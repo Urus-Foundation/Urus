@@ -9,6 +9,7 @@ void lexer_init(Lexer *l, const char *source, size_t length) {
     l->length = length;
     l->pos = 0;
     l->line = 1;
+    l->line_start = 0;
 }
 
 static char peek(Lexer *l) {
@@ -143,11 +144,11 @@ static Token lex_fstring(Lexer *l) {
 
 static Token lex_number(Lexer *l) {
     const char *start = l->source + l->pos;
-    while (isdigit(peek(l))) advance(l);
+    while (isdigit(peek(l)) || (peek(l) == '_' && isdigit(peek_next(l)))) advance(l);
     if (peek(l) == '.' && peek_next(l) != '.') {
         // '.' followed by '.' is range operator (e.g. 0..10), not float
         advance(l); // consume '.'
-        while (isdigit(peek(l))) advance(l);
+        while (isdigit(peek(l)) || (peek(l) == '_' && isdigit(peek_next(l)))) advance(l);
         return make_token(l, TOK_FLOAT_LIT, start, (size_t)(l->source + l->pos - start));
     }
     return make_token(l, TOK_INT_LIT, start, (size_t)(l->source + l->pos - start));

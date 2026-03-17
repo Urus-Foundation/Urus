@@ -1,0 +1,10 @@
+fn main(): void {
+    let a: int = 1_000;
+    let b: int = 1_000_000;
+    let c: float = 3.14_159;
+    let d: float = 1_000.5;
+    print(a);
+    print(b);
+    print(c);
+    print(d);
+}
