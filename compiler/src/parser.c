@@ -7,6 +7,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <errno.h>
 
 // ---- Helpers ----
 
@@ -43,6 +44,10 @@ static void error_at(Parser *p, Token t, const char *msg) {
     if (p->had_error) return;
     p->had_error = true;
     report_error(p->filename, &t, msg);
+}
+
+static void warn_at(Parser *p, Token t, const char *msg) {
+    report_warn(p->filename, &t, msg);
 }
 
 static Token expect(Parser *p, TokenType type, const char *msg) {
@@ -209,8 +214,12 @@ static AstNode *parse_primary(Parser *p) {
 
     if (match(p, TOK_INT_LIT)) {
         AstNode *n = ast_new(NODE_INT_LIT, t);
+        errno = 0;
         char *s = tok_num_str(t);
         n->as.int_lit.value = strtoll(s, NULL, 10);
+        if (errno == ERANGE) {
+            warn_at(p, t, "integer literal out of range");
+        }
         free(s);
         return n;
     }
