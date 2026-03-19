@@ -13,6 +13,167 @@ extern const unsigned int urus_runtime_header_data_len;
 static void gen_expr(CodeBuf *buf, AstNode *node);
 static void gen_stmt(CodeBuf *buf, AstNode *node);
 static void gen_block(CodeBuf *buf, AstNode *node);
+static void gen_type(CodeBuf *buf, AstType *t);
+static void emit(CodeBuf *buf, const char *fmt, ...);
+static void emit_indent(CodeBuf *buf);
+
+// ---- Tuple typedef tracking ----
+static const char *tuple_type_name(AstType *t) {
+    static char buf[512];
+    int pos = snprintf(buf, sizeof(buf), "_urus_tuple");
+    for (int i = 0; i < t->element_count; i++) {
+        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos, "_%s", ast_type_str(t->element_types[i]));
+    }
+    // Sanitize: replace non-alnum with _
+    for (int i = 0; buf[i]; i++) {
+        if (buf[i] != '_' && !((buf[i] >= 'a' && buf[i] <= 'z') ||
+            (buf[i] >= 'A' && buf[i] <= 'Z') ||
+            (buf[i] >= '0' && buf[i] <= '9'))) {
+            buf[i] = '_';
+        }
+    }
+    return buf;
+}
+
+#define MAX_TUPLE_TYPES 64
+static char *tuple_typedefs[MAX_TUPLE_TYPES];
+static int tuple_typedef_count = 0;
+
+static bool tuple_typedef_exists(const char *name) {
+    for (int i = 0; i < tuple_typedef_count; i++) {
+        if (strcmp(tuple_typedefs[i], name) == 0) return true;
+    }
+    return false;
+}
+
+// Emit a single tuple typedef given a TYPE_TUPLE AstType
+static void emit_single_tuple_typedef(CodeBuf *buf, AstType *t) {
+    const char *name = tuple_type_name(t);
+    if (tuple_typedef_exists(name)) return;
+    // First emit typedefs for nested tuple element types
+    for (int i = 0; i < t->element_count; i++) {
+        if (t->element_types[i]->kind == TYPE_TUPLE) {
+            emit_single_tuple_typedef(buf, t->element_types[i]);
+        }
+    }
+    tuple_typedefs[tuple_typedef_count++] = strdup(name);
+    emit(buf, "typedef struct { ");
+    for (int i = 0; i < t->element_count; i++) {
+        gen_type(buf, t->element_types[i]);
+        emit(buf, " f%d; ", i);
+    }
+    emit(buf, "} %s;\n", name);
+}
+
+static void collect_and_emit_tuple_typedefs_from_type(CodeBuf *buf, AstType *t) {
+    if (!t) return;
+    if (t->kind == TYPE_TUPLE) {
+        emit_single_tuple_typedef(buf, t);
+    }
+    if (t->kind == TYPE_ARRAY) collect_and_emit_tuple_typedefs_from_type(buf, t->element);
+    if (t->kind == TYPE_RESULT) {
+        collect_and_emit_tuple_typedefs_from_type(buf, t->ok_type);
+        collect_and_emit_tuple_typedefs_from_type(buf, t->err_type);
+    }
+}
+
+static void collect_and_emit_tuple_typedefs(CodeBuf *buf, AstNode *node) {
+    if (!node) return;
+    if (node->resolved_type) collect_and_emit_tuple_typedefs_from_type(buf, node->resolved_type);
+    switch (node->kind) {
+    case NODE_PROGRAM:
+        for (int i = 0; i < node->as.program.decl_count; i++)
+            collect_and_emit_tuple_typedefs(buf, node->as.program.decls[i]);
+        break;
+    case NODE_FN_DECL:
+        collect_and_emit_tuple_typedefs_from_type(buf, node->as.fn_decl.return_type);
+        for (int i = 0; i < node->as.fn_decl.param_count; i++)
+            collect_and_emit_tuple_typedefs_from_type(buf, node->as.fn_decl.params[i].type);
+        collect_and_emit_tuple_typedefs(buf, node->as.fn_decl.body);
+        break;
+    case NODE_BLOCK:
+        for (int i = 0; i < node->as.block.stmt_count; i++)
+            collect_and_emit_tuple_typedefs(buf, node->as.block.stmts[i]);
+        break;
+    case NODE_LET_STMT:
+        collect_and_emit_tuple_typedefs_from_type(buf, node->as.let_stmt.type);
+        collect_and_emit_tuple_typedefs(buf, node->as.let_stmt.init);
+        break;
+    case NODE_ASSIGN_STMT:
+        collect_and_emit_tuple_typedefs(buf, node->as.assign_stmt.target);
+        collect_and_emit_tuple_typedefs(buf, node->as.assign_stmt.value);
+        break;
+    case NODE_IF_STMT:
+        collect_and_emit_tuple_typedefs(buf, node->as.if_stmt.condition);
+        collect_and_emit_tuple_typedefs(buf, node->as.if_stmt.then_block);
+        collect_and_emit_tuple_typedefs(buf, node->as.if_stmt.else_branch);
+        break;
+    case NODE_WHILE_STMT:
+        collect_and_emit_tuple_typedefs(buf, node->as.while_stmt.condition);
+        collect_and_emit_tuple_typedefs(buf, node->as.while_stmt.body);
+        break;
+    case NODE_FOR_STMT:
+        collect_and_emit_tuple_typedefs(buf, node->as.for_stmt.start);
+        collect_and_emit_tuple_typedefs(buf, node->as.for_stmt.end);
+        collect_and_emit_tuple_typedefs(buf, node->as.for_stmt.iterable);
+        collect_and_emit_tuple_typedefs(buf, node->as.for_stmt.body);
+        break;
+    case NODE_RETURN_STMT:
+        collect_and_emit_tuple_typedefs(buf, node->as.return_stmt.value);
+        break;
+    case NODE_EXPR_STMT:
+        collect_and_emit_tuple_typedefs(buf, node->as.expr_stmt.expr);
+        break;
+    case NODE_BINARY:
+        collect_and_emit_tuple_typedefs(buf, node->as.binary.left);
+        collect_and_emit_tuple_typedefs(buf, node->as.binary.right);
+        break;
+    case NODE_UNARY:
+        collect_and_emit_tuple_typedefs(buf, node->as.unary.operand);
+        break;
+    case NODE_CALL:
+        collect_and_emit_tuple_typedefs(buf, node->as.call.callee);
+        for (int i = 0; i < node->as.call.arg_count; i++)
+            collect_and_emit_tuple_typedefs(buf, node->as.call.args[i]);
+        break;
+    case NODE_FIELD_ACCESS:
+        collect_and_emit_tuple_typedefs(buf, node->as.field_access.object);
+        break;
+    case NODE_INDEX:
+        collect_and_emit_tuple_typedefs(buf, node->as.index_expr.object);
+        collect_and_emit_tuple_typedefs(buf, node->as.index_expr.index);
+        break;
+    case NODE_ARRAY_LIT:
+        for (int i = 0; i < node->as.array_lit.count; i++)
+            collect_and_emit_tuple_typedefs(buf, node->as.array_lit.elements[i]);
+        break;
+    case NODE_TUPLE_LIT:
+        for (int i = 0; i < node->as.tuple_lit.count; i++)
+            collect_and_emit_tuple_typedefs(buf, node->as.tuple_lit.elements[i]);
+        break;
+    case NODE_STRUCT_LIT:
+        for (int i = 0; i < node->as.struct_lit.field_count; i++)
+            collect_and_emit_tuple_typedefs(buf, node->as.struct_lit.fields[i].value);
+        break;
+    case NODE_MATCH:
+        collect_and_emit_tuple_typedefs(buf, node->as.match_stmt.target);
+        for (int i = 0; i < node->as.match_stmt.arm_count; i++)
+            collect_and_emit_tuple_typedefs(buf, node->as.match_stmt.arms[i].body);
+        break;
+    case NODE_ENUM_INIT:
+        for (int i = 0; i < node->as.enum_init.arg_count; i++)
+            collect_and_emit_tuple_typedefs(buf, node->as.enum_init.args[i]);
+        break;
+    case NODE_OK_EXPR:
+    case NODE_ERR_EXPR:
+        collect_and_emit_tuple_typedefs(buf, node->as.result_expr.value);
+        break;
+    case NODE_LAMBDA:
+        collect_and_emit_tuple_typedefs(buf, node->as.lambda.body);
+        break;
+    default: break;
+    }
+}
 
 // ---- Buffer helpers ----
 
@@ -91,6 +252,9 @@ static void gen_type(CodeBuf *buf, AstType *t) {
     case TYPE_NAMED:  emit(buf, "%s*", t->name); break;
     case TYPE_RESULT: emit(buf, "urus_result*"); break;
     case TYPE_FN:    emit(buf, "void*"); break; // function pointers as void*
+    case TYPE_TUPLE:
+        emit(buf, "%s", tuple_type_name(t));
+        break;
     }
 }
 
@@ -350,8 +514,17 @@ static void gen_expr(CodeBuf *buf, AstNode *node) {
         break;
     }
     case NODE_FIELD_ACCESS:
-        gen_expr(buf, node->as.field_access.object);
-        emit(buf, "->%s", node->as.field_access.field);
+        if (node->as.field_access.object->resolved_type &&
+            node->as.field_access.object->resolved_type->kind == TYPE_TUPLE) {
+            gen_expr(buf, node->as.field_access.object);
+            emit(buf, ".f%s", node->as.field_access.field);
+        } else {
+            gen_expr(buf, node->as.field_access.object);
+            emit(buf, "->%s", node->as.field_access.field);
+        }
+        break;
+    case NODE_TUPLE_LIT:
+        emit(buf, "_urus_tup_%d", node->_codegen_tmp);
         break;
     case NODE_INDEX:
         gen_array_get(buf, node);
@@ -514,6 +687,28 @@ static int gen_expr_pre(CodeBuf *buf, AstNode *node) {
         emit(buf, "urus_result* _urus_res_%d = urus_result_err(", tmp);
         gen_expr(buf, node->as.result_expr.value);
         emit(buf, ");\n");
+        return tmp;
+    }
+    case NODE_CALL: {
+        for (int i = 0; i < node->as.call.arg_count; i++) {
+            gen_expr_pre(buf, node->as.call.args[i]);
+        }
+        return -1;
+    }
+    case NODE_TUPLE_LIT: {
+        for (int i = 0; i < node->as.tuple_lit.count; i++) {
+            gen_expr_pre(buf, node->as.tuple_lit.elements[i]);
+        }
+        int tmp = buf->tmp_counter++;
+        node->_codegen_tmp = tmp;
+        emit_indent(buf);
+        gen_type(buf, node->resolved_type);
+        emit(buf, " _urus_tup_%d = { ", tmp);
+        for (int i = 0; i < node->as.tuple_lit.count; i++) {
+            if (i > 0) emit(buf, ", ");
+            gen_expr(buf, node->as.tuple_lit.elements[i]);
+        }
+        emit(buf, " };\n");
         return tmp;
     }
     default:
@@ -859,6 +1054,11 @@ void codegen_generate(CodeBuf *buf, AstNode *program) {
     emit(buf, "// Generated by: URUS Compiler, version %s\n", URUS_COMPILER_VERSION);
     emit(buf, "%.*s\n", urus_runtime_header_data_len, urus_runtime_header_data);
     emit(buf, "\n\n/* +---+ Program start +---+ */\n\n");
+
+    // Pass 0: collect and emit tuple typedefs
+    tuple_typedef_count = 0;
+    collect_and_emit_tuple_typedefs(buf, program);
+    if (tuple_typedef_count > 0) emit(buf, "\n");
 
     // Pass 1: struct and enum forward declarations
     for (int i = 0; i < program->as.program.decl_count; i++) {

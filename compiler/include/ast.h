@@ -19,6 +19,7 @@ typedef enum {
     TYPE_NAMED,   // struct or enum name
     TYPE_RESULT,  // Result<ok_type, err_type>
     TYPE_FN,      // fn(T1, T2) -> R
+    TYPE_TUPLE,   // (T1, T2, ...)
 } TypeKind;
 
 struct AstType {
@@ -31,6 +32,9 @@ struct AstType {
     AstType **param_types;
     int param_count;
     AstType *return_type;
+    // for TYPE_TUPLE
+    AstType **element_types;
+    int element_count;
 };
 
 // ---- AST Node kinds ----
@@ -72,6 +76,8 @@ typedef enum {
     NODE_OK_EXPR,     // Ok(value)
     NODE_ERR_EXPR,    // Err(value)
     NODE_LAMBDA,      // |params| -> type { body }
+    NODE_TUPLE_LIT,   // (expr1, expr2, ...)
+    NODE_RUNE_DECL,   // rune name(params) { body }
 } NodeKind;
 
 // ---- Param ----
@@ -239,6 +245,9 @@ struct AstNode {
         // NODE_OK_EXPR / NODE_ERR_EXPR
         struct { AstNode *value; } result_expr;
 
+        // NODE_TUPLE_LIT
+        struct { AstNode **elements; int count; } tuple_lit;
+
         // NODE_LAMBDA
         struct {
             Param *params;
@@ -250,6 +259,15 @@ struct AstNode {
             int capture_count;
             int lambda_id;       // unique ID for codegen
         } lambda;
+
+        // NODE_RUNE_DECL
+        struct {
+            char *name;
+            char **param_names;
+            int param_count;
+            Token *body_tokens;
+            int body_token_count;
+        } rune_decl;
     } as;
 
     // Filled by semantic analysis
@@ -269,6 +287,7 @@ AstType *ast_type_array(AstType *element);
 AstType *ast_type_named(const char *name);
 AstType *ast_type_result(AstType *ok_type, AstType *err_type);
 AstType *ast_type_fn(AstType **param_types, int param_count, AstType *return_type);
+AstType *ast_type_tuple(AstType **elems, int count);
 char *ast_strdup(const char *s, size_t len);
 
 // Type utilities

@@ -361,6 +361,21 @@ static AstType *check_expr(Sema *ctx, AstNode *node) {
 
     case NODE_FIELD_ACCESS: {
         AstType *obj_type = check_expr(ctx, node->as.field_access.object);
+        if (obj_type && obj_type->kind == TYPE_TUPLE) {
+            const char *field = node->as.field_access.field;
+            char *end;
+            long idx = strtol(field, &end, 10);
+            if (*end != '\0' || idx < 0) {
+                sema_error(ctx, &node->tok, "invalid tuple index '%s'", field);
+                return set_type(node, ast_type_simple(TYPE_VOID));
+            }
+            if (idx >= obj_type->element_count) {
+                sema_error(ctx, &node->tok, "tuple index %ld out of range (tuple has %d elements)",
+                           idx, obj_type->element_count);
+                return set_type(node, ast_type_simple(TYPE_VOID));
+            }
+            return set_type(node, ast_type_clone(obj_type->element_types[idx]));
+        }
         if (!obj_type || obj_type->kind != TYPE_NAMED) {
             sema_error(ctx, &node->as.field_access.object->tok, "field access on non-struct type '%s'",
                        ast_type_str(obj_type));
@@ -523,6 +538,16 @@ static AstType *check_expr(Sema *ctx, AstNode *node) {
         AstType *val_type = check_expr(ctx, node->as.result_expr.value);
         return set_type(node, ast_type_result(ast_type_simple(TYPE_VOID),
                                                val_type ? ast_type_clone(val_type) : ast_type_simple(TYPE_STR)));
+    }
+
+    case NODE_TUPLE_LIT: {
+        int count = node->as.tuple_lit.count;
+        AstType **elem_types = malloc(sizeof(AstType *) * (size_t)count);
+        for (int i = 0; i < count; i++) {
+            AstType *t = check_expr(ctx, node->as.tuple_lit.elements[i]);
+            elem_types[i] = t ? ast_type_clone(t) : ast_type_simple(TYPE_VOID);
+        }
+        return set_type(node, ast_type_tuple(elem_types, count));
     }
 
     default:

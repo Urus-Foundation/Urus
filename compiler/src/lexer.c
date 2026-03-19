@@ -81,6 +81,7 @@ static TokenType check_keyword(const char *start, size_t len) {
         {"enum",     4, TOK_ENUM},
         {"match",    5, TOK_MATCH},
         {"import",   6, TOK_IMPORT},
+        {"rune",     4, TOK_RUNE},
         {"int",      3, TOK_INT},
         {"float",    5, TOK_FLOAT},
         {"bool",     4, TOK_BOOL},
@@ -325,6 +326,7 @@ const char *token_type_name(TokenType type) {
     case TOK_ENUM: return "ENUM";
     case TOK_MATCH: return "MATCH";
     case TOK_IMPORT: return "IMPORT";
+    case TOK_RUNE: return "RUNE";
     case TOK_ARROW: return "ARROW";
     case TOK_INT: return "INT";
     case TOK_FLOAT: return "FLOAT";

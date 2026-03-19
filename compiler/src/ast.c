@@ -52,6 +52,14 @@ AstType *ast_type_fn(AstType **param_types, int param_count, AstType *return_typ
     return t;
 }
 
+AstType *ast_type_tuple(AstType **elems, int count) {
+    AstType *t = calloc(1, sizeof(AstType));
+    t->kind = TYPE_TUPLE;
+    t->element_types = elems;
+    t->element_count = count;
+    return t;
+}
+
 char *ast_strdup(const char *s, size_t len) {
     char *d = malloc(len + 1);
     memcpy(d, s, len);
@@ -76,6 +84,14 @@ AstType *ast_type_clone(AstType *t) {
                 c->param_types[i] = ast_type_clone(t->param_types[i]);
         }
     }
+    if (t->kind == TYPE_TUPLE) {
+        c->element_count = t->element_count;
+        if (t->element_count > 0) {
+            c->element_types = malloc(sizeof(AstType *) * (size_t)t->element_count);
+            for (int i = 0; i < t->element_count; i++)
+                c->element_types[i] = ast_type_clone(t->element_types[i]);
+        }
+    }
     return c;
 }
 
@@ -90,6 +106,12 @@ bool ast_types_equal(AstType *a, AstType *b) {
         if (!ast_types_equal(a->return_type, b->return_type)) return false;
         for (int i = 0; i < a->param_count; i++)
             if (!ast_types_equal(a->param_types[i], b->param_types[i])) return false;
+        return true;
+    }
+    if (a->kind == TYPE_TUPLE) {
+        if (a->element_count != b->element_count) return false;
+        for (int i = 0; i < a->element_count; i++)
+            if (!ast_types_equal(a->element_types[i], b->element_types[i])) return false;
         return true;
     }
     return true;
@@ -134,6 +156,15 @@ const char *ast_type_str(AstType *t) {
         snprintf(buf + pos, 256 - (size_t)pos, ") -> %s", ast_type_str(t->return_type));
         return buf;
     }
+    case TYPE_TUPLE: {
+        int pos = snprintf(buf, 256, "(");
+        for (int i = 0; i < t->element_count; i++) {
+            if (i > 0) pos += snprintf(buf + pos, 256 - (size_t)pos, ", ");
+            pos += snprintf(buf + pos, 256 - (size_t)pos, "%s", ast_type_str(t->element_types[i]));
+        }
+        snprintf(buf + pos, 256 - (size_t)pos, ")");
+        return buf;
+    }
     }
     return "?";
 }
@@ -161,6 +192,14 @@ static void print_type(AstType *t) {
         }
         printf(") -> ");
         print_type(t->return_type);
+        break;
+    case TYPE_TUPLE:
+        printf("(");
+        for (int i = 0; i < t->element_count; i++) {
+            if (i > 0) printf(", ");
+            print_type(t->element_types[i]);
+        }
+        printf(")");
         break;
     }
 }
@@ -380,6 +419,18 @@ void ast_print(AstNode *node, int ind) {
         printf("\n");
         ast_print(node->as.lambda.body, ind + 1);
         break;
+
+    case NODE_TUPLE_LIT:
+        printf("TupleLit (%d elements)\n", node->as.tuple_lit.count);
+        for (int i = 0; i < node->as.tuple_lit.count; i++)
+            ast_print(node->as.tuple_lit.elements[i], ind + 1);
+        break;
+
+    case NODE_RUNE_DECL:
+        printf("RuneDecl '%s' (%d params, %d body tokens)\n",
+               node->as.rune_decl.name, node->as.rune_decl.param_count,
+               node->as.rune_decl.body_token_count);
+        break;
     }
 }
 
@@ -394,6 +445,11 @@ void ast_type_free(AstType *type) {
             ast_type_free(type->param_types[i]);
         free(type->param_types);
         ast_type_free(type->return_type);
+    }
+    if (type->kind == TYPE_TUPLE) {
+        for (int i = 0; i < type->element_count; i++)
+            ast_type_free(type->element_types[i]);
+        free(type->element_types);
     }
     free(type);
 }
@@ -556,6 +612,18 @@ void ast_free(AstNode *node) {
         }
         free(node->as.lambda.captures);
         free(node->as.lambda.capture_types);
+        break;
+    case NODE_TUPLE_LIT:
+        for (int i = 0; i < node->as.tuple_lit.count; i++)
+            ast_free(node->as.tuple_lit.elements[i]);
+        free(node->as.tuple_lit.elements);
+        break;
+    case NODE_RUNE_DECL:
+        free(node->as.rune_decl.name);
+        for (int i = 0; i < node->as.rune_decl.param_count; i++)
+            free(node->as.rune_decl.param_names[i]);
+        free(node->as.rune_decl.param_names);
+        free(node->as.rune_decl.body_tokens);
         break;
     case NODE_INT_LIT:
     case NODE_FLOAT_LIT:

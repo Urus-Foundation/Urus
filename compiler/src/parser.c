@@ -86,6 +86,26 @@ static AstNode *parse_statement(Parser *p);
 static AstNode *parse_block(Parser *p);
 static AstType *parse_type(Parser *p);
 
+// ---- Rune (macro) table ----
+typedef struct {
+    char *name;
+    char **param_names;
+    int param_count;
+    Token *body_tokens;
+    int body_token_count;
+} RuneDef;
+
+#define MAX_RUNES 64
+static RuneDef rune_defs[MAX_RUNES];
+static int rune_count = 0;
+
+static RuneDef *find_rune(const char *name) {
+    for (int i = 0; i < rune_count; i++) {
+        if (strcmp(rune_defs[i].name, name) == 0) return &rune_defs[i];
+    }
+    return NULL;
+}
+
 // ---- Type parsing ----
 
 static AstType *parse_type(Parser *p) {
@@ -98,6 +118,22 @@ static AstType *parse_type(Parser *p) {
         AstType *elem = parse_type(p);
         expect(p, TOK_RBRACKET, "expected ']' after array type");
         return ast_type_array(elem);
+    }
+    // Tuple type: (T1, T2, ...)
+    if (match(p, TOK_LPAREN)) {
+        int cap = 4, count = 0;
+        AstType **elems = malloc(sizeof(AstType *) * (size_t)cap);
+        if (!check(p, TOK_RPAREN)) {
+            do {
+                if (count >= cap) {
+                    cap *= 2;
+                    elems = realloc(elems, sizeof(AstType *) * (size_t)cap);
+                }
+                elems[count++] = parse_type(p);
+            } while (match(p, TOK_COMMA));
+        }
+        expect(p, TOK_RPAREN, "expected ')' after tuple type");
+        return ast_type_tuple(elems, count);
     }
     // Result<T, E>
     if (check(p, TOK_IDENT)) {
@@ -307,6 +343,130 @@ static AstNode *parse_primary(Parser *p) {
     }
     if (match(p, TOK_IDENT)) {
         char *name = tok_str(t);
+
+        // Check for rune invocation: name!(args)
+        if (check(p, TOK_NOT)) {
+            int saved_bang = p->pos;
+            advance_tok(p); // skip !
+            if (check(p, TOK_LPAREN)) {
+                RuneDef *rune = find_rune(name);
+                if (rune) {
+                    advance_tok(p); // skip (
+
+                    // Collect argument token spans
+                    // Each argument is a span of tokens delimited by , or )
+                    int arg_cap = 8;
+                    Token **arg_tokens = malloc(sizeof(Token *) * (size_t)arg_cap);
+                    int *arg_lens = malloc(sizeof(int) * (size_t)arg_cap);
+                    int arg_count = 0;
+
+                    if (!check(p, TOK_RPAREN)) {
+                        while (1) {
+                            if (arg_count >= arg_cap) {
+                                arg_cap *= 2;
+                                arg_tokens = realloc(arg_tokens, sizeof(Token *) * (size_t)arg_cap);
+                                arg_lens = realloc(arg_lens, sizeof(int) * (size_t)arg_cap);
+                            }
+                            int start = p->pos;
+                            int depth2 = 0;
+                            // Scan until , or ) at depth 0
+                            while (!at_end(p)) {
+                                TokenType tt = current(p).type;
+                                if (tt == TOK_LPAREN || tt == TOK_LBRACKET || tt == TOK_LBRACE) depth2++;
+                                else if (tt == TOK_RPAREN || tt == TOK_RBRACKET || tt == TOK_RBRACE) {
+                                    if (depth2 == 0) break;
+                                    depth2--;
+                                }
+                                else if (tt == TOK_COMMA && depth2 == 0) break;
+                                advance_tok(p);
+                            }
+                            int len = p->pos - start;
+                            arg_tokens[arg_count] = &p->tokens[start];
+                            arg_lens[arg_count] = len;
+                            arg_count++;
+                            if (!match(p, TOK_COMMA)) break;
+                        }
+                    }
+                    expect(p, TOK_RPAREN, "expected ')' after rune arguments");
+
+                    if (arg_count != rune->param_count) {
+                        error_at(p, t, "rune expects different number of arguments");
+                        free(arg_tokens); free(arg_lens); free(name);
+                        return ast_new(NODE_INT_LIT, t);
+                    }
+
+                    // Build expanded token stream: substitute params with arg tokens
+                    int exp_cap = rune->body_token_count * 2 + 16;
+                    Token *expanded = malloc(sizeof(Token) * (size_t)exp_cap);
+                    int exp_count = 0;
+
+                    for (int i = 0; i < rune->body_token_count; i++) {
+                        Token bt = rune->body_tokens[i];
+                        bool substituted = false;
+                        if (bt.type == TOK_IDENT) {
+                            for (int j = 0; j < rune->param_count; j++) {
+                                if (bt.length == strlen(rune->param_names[j]) &&
+                                    memcmp(bt.start, rune->param_names[j], bt.length) == 0) {
+                                    // Replace this token with the argument's tokens
+                                    int needed = exp_count + arg_lens[j] + 1;
+                                    if (needed >= exp_cap) {
+                                        exp_cap = needed * 2;
+                                        expanded = realloc(expanded, sizeof(Token) * (size_t)exp_cap);
+                                    }
+                                    for (int k = 0; k < arg_lens[j]; k++) {
+                                        expanded[exp_count++] = arg_tokens[j][k];
+                                    }
+                                    substituted = true;
+                                    break;
+                                }
+                            }
+                        }
+                        if (!substituted) {
+                            if (exp_count >= exp_cap) {
+                                exp_cap *= 2;
+                                expanded = realloc(expanded, sizeof(Token) * (size_t)exp_cap);
+                            }
+                            expanded[exp_count++] = bt;
+                        }
+                    }
+
+                    // Add EOF token
+                    if (exp_count >= exp_cap) {
+                        exp_cap++;
+                        expanded = realloc(expanded, sizeof(Token) * (size_t)exp_cap);
+                    }
+                    Token eof_tok = {TOK_EOF, "", 0, t.line, t.col};
+                    expanded[exp_count++] = eof_tok;
+
+                    // Save parser state and parse expanded tokens
+                    Token *saved_tokens = p->tokens;
+                    int saved_count = p->count;
+                    int saved_pos = p->pos;
+
+                    p->tokens = expanded;
+                    p->count = exp_count;
+                    p->pos = 0;
+
+                    AstNode *result = parse_expr(p);
+
+                    // Restore parser state
+                    p->tokens = saved_tokens;
+                    p->count = saved_count;
+                    p->pos = saved_pos;
+
+                    free(expanded);
+                    free(arg_tokens);
+                    free(arg_lens);
+                    free(name);
+                    return result;
+                }
+                // Not a rune — backtrack
+                p->pos = saved_bang;
+            } else {
+                p->pos = saved_bang;
+            }
+        }
+
         // Check for enum init: EnumName.Variant or EnumName.Variant(args)
         // Only treat as enum init if the name starts with an uppercase letter
         // (enum names are PascalCase; lowercase names are variables/field access)
@@ -429,10 +589,31 @@ static AstNode *parse_primary(Parser *p) {
         return n;
     }
     if (match(p, TOK_LPAREN)) {
-        AstNode *expr = parse_expr(p);
+        Token paren_tok = previous(p);
+        AstNode *first = parse_expr(p);
+        if (match(p, TOK_COMMA)) {
+            // Tuple literal: (e1, e2, ...)
+            int cap = 4, count = 1;
+            AstNode **elems = malloc(sizeof(AstNode *) * (size_t)cap);
+            elems[0] = first;
+            if (!check(p, TOK_RPAREN)) {
+                do {
+                    if (count >= cap) {
+                        cap *= 2;
+                        elems = realloc(elems, sizeof(AstNode *) * (size_t)cap);
+                    }
+                    elems[count++] = parse_expr(p);
+                } while (match(p, TOK_COMMA));
+            }
+            expect(p, TOK_RPAREN, "expected ')' after tuple");
+            AstNode *n = ast_new(NODE_TUPLE_LIT, paren_tok);
+            n->as.tuple_lit.elements = elems;
+            n->as.tuple_lit.count = count;
+            return n;
+        }
         expect(p, TOK_RPAREN, "expected ')'");
-        expr->parenthesized = true;
-        return expr;
+        first->parenthesized = true;
+        return first;
     }
 
     error_at(p, t, "expected expression");
@@ -461,7 +642,12 @@ static AstNode *parse_call(Parser *p) {
             call->as.call.arg_count = count;
             expr = call;
         } else if (match(p, TOK_DOT)) {
-            Token field = expect(p, TOK_IDENT, "expected field name after '.'");
+            Token field;
+            if (check(p, TOK_INT_LIT)) {
+                field = advance_tok(p);
+            } else {
+                field = expect(p, TOK_IDENT, "expected field name after '.'");
+            }
             AstNode *access = ast_new(NODE_FIELD_ACCESS, field);
             access->as.field_access.object = expr;
             access->as.field_access.field = tok_str(field);
@@ -940,15 +1126,82 @@ static AstNode *parse_import(Parser *p) {
     return n;
 }
 
+// ---- Rune declaration: rune name(p1, p2) { body tokens } ----
+static AstNode *parse_rune_decl(Parser *p) {
+    Token rune_tok = advance_tok(p); // consume 'rune'
+    Token name_tok = expect(p, TOK_IDENT, "expected rune name");
+    char *name = tok_str(name_tok);
+
+    // Parse parameters
+    expect(p, TOK_LPAREN, "expected '(' after rune name");
+    int pcap = 4, pcount = 0;
+    char **params = malloc(sizeof(char *) * (size_t)pcap);
+    if (!check(p, TOK_RPAREN)) {
+        do {
+            if (pcount >= pcap) {
+                pcap *= 2;
+                params = realloc(params, sizeof(char *) * (size_t)pcap);
+            }
+            Token pt = expect(p, TOK_IDENT, "expected parameter name");
+            params[pcount++] = tok_str(pt);
+        } while (match(p, TOK_COMMA));
+    }
+    expect(p, TOK_RPAREN, "expected ')' after rune parameters");
+
+    // Collect body tokens between { and } (track brace nesting)
+    expect(p, TOK_LBRACE, "expected '{' for rune body");
+    int bcap = 32, bcount = 0;
+    Token *body = malloc(sizeof(Token) * (size_t)bcap);
+    int depth = 1;
+    while (!at_end(p) && depth > 0) {
+        Token tok = current(p);
+        if (tok.type == TOK_LBRACE) depth++;
+        if (tok.type == TOK_RBRACE) {
+            depth--;
+            if (depth == 0) break;
+        }
+        if (bcount >= bcap) {
+            bcap *= 2;
+            body = realloc(body, sizeof(Token) * (size_t)bcap);
+        }
+        body[bcount++] = tok;
+        advance_tok(p);
+    }
+    expect(p, TOK_RBRACE, "expected '}' after rune body");
+
+    // Register in rune table
+    if (rune_count < MAX_RUNES) {
+        rune_defs[rune_count].name = strdup(name);
+        rune_defs[rune_count].param_names = malloc(sizeof(char *) * (size_t)pcount);
+        for (int i = 0; i < pcount; i++)
+            rune_defs[rune_count].param_names[i] = strdup(params[i]);
+        rune_defs[rune_count].param_count = pcount;
+        rune_defs[rune_count].body_tokens = malloc(sizeof(Token) * (size_t)bcount);
+        memcpy(rune_defs[rune_count].body_tokens, body, sizeof(Token) * (size_t)bcount);
+        rune_defs[rune_count].body_token_count = bcount;
+        rune_count++;
+    }
+
+    AstNode *n = ast_new(NODE_RUNE_DECL, rune_tok);
+    n->as.rune_decl.name = name;
+    n->as.rune_decl.param_names = params;
+    n->as.rune_decl.param_count = pcount;
+    n->as.rune_decl.body_tokens = body;
+    n->as.rune_decl.body_token_count = bcount;
+    return n;
+}
+
 static AstNode *parse_declaration(Parser *p) {
     if (check(p, TOK_FN)) return parse_fn_decl(p);
     if (check(p, TOK_STRUCT)) return parse_struct_decl(p);
     if (check(p, TOK_ENUM)) return parse_enum_decl(p);
     if (check(p, TOK_IMPORT)) return parse_import(p);
+    if (check(p, TOK_RUNE)) return parse_rune_decl(p);
     return parse_statement(p);
 }
 
 AstNode *parser_parse(Parser *p) {
+    rune_count = 0; // reset rune table
     AstNode *program = ast_new(NODE_PROGRAM, current(p));
     int cap = 16, count = 0;
     AstNode **decls = malloc(sizeof(AstNode *) * (size_t)cap);
