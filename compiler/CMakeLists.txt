@@ -37,6 +37,7 @@ set(SOURCES
     src/error.c
     src/sema.c
     src/codegen.c
+    src/preprocess.c
 )
 
 add_executable(urusc ${SOURCES} ${URUS_RUNTIME_EMBEDDED})
