@@ -274,6 +274,12 @@ static const char *elem_sizeof(AstType *t) {
     case TYPE_STR:   return "sizeof(urus_str*)";
     case TYPE_NAMED: return "sizeof(void*)";
     case TYPE_ARRAY: return "sizeof(urus_array*)";
+    case TYPE_RESULT: return "sizeof(urus_result*)";
+    case TYPE_TUPLE: {
+        static char buf[128];
+        snprintf(buf, sizeof(buf), "sizeof(%s)", tuple_type_name(t));
+        return buf;
+    }
     default: return "sizeof(int64_t)";
     }
 }
@@ -288,6 +294,8 @@ static const char *elem_ctype(AstType *t) {
     case TYPE_STR:   return "urus_str*";
     case TYPE_NAMED: return "void*";
     case TYPE_ARRAY: return "urus_array*";
+    case TYPE_RESULT: return "urus_result*";
+    case TYPE_TUPLE: return tuple_type_name(t);
     default: return "int64_t";
     }
 }
