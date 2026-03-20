@@ -406,7 +406,16 @@ static void gen_expr(CodeBuf *buf, AstNode *node) {
         const char *s = node->as.str_lit.value;
         for (size_t i = 0; s[i]; i++) {
             if (s[i] == '"') emit(buf, "\\\"");
-            else if (s[i] == '\\') emit(buf, "\\\\");
+            else if (s[i] == '\\' && s[i + 1]) {
+                char next = s[i + 1];
+                if (next == 'n' || next == 'r' || next == 't' || next == '0' ||
+                    next == '\\' || next == '"') {
+                    emit(buf, "\\%c", next);
+                    i++; // skip next char, already emitted
+                } else {
+                    emit(buf, "\\\\");
+                }
+            }
             else if (s[i] == '\n') emit(buf, "\\n");
             else emit(buf, "%c", s[i]);
         }
