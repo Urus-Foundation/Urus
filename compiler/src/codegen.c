@@ -492,6 +492,8 @@ static void gen_expr(CodeBuf *buf, AstNode *node) {
             {"read_file",      "urus_read_file"},
             {"write_file",     "urus_write_file"},
             {"append_file",    "urus_append_file"},
+            {"http_get",       "urus_http_get"},
+            {"http_post",      "urus_http_post"},
             {"exit",           "urus_exit"},
             {"assert",         "urus_assert"},
             {"len",            "urus_len"},

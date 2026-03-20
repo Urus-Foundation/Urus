@@ -532,4 +532,69 @@ static void urus_assert(bool cond, urus_str *msg) {
     }
 }
 
+// ============================================================
+// HTTP (via libcurl or system command)
+// ============================================================
+
+#ifdef _WIN32
+#include <windows.h>
+#include <winhttp.h>
+#pragma comment(lib, "winhttp.lib")
+#else
+// On Unix, we use popen with curl
+#endif
+
+static urus_str *urus_http_get(urus_str *url) {
+    // Use popen + curl as portable fallback
+    char cmd[4096];
+    snprintf(cmd, sizeof(cmd), "curl -s \"%s\"", url->data);
+    FILE *fp = popen(cmd, "r");
+    if (!fp) {
+        fprintf(stderr, "Error: failed to execute curl\n");
+        return urus_str_from("");
+    }
+    size_t cap = 4096;
+    size_t len = 0;
+    char *buf = (char *)urus_alloc(cap);
+    size_t n;
+    while ((n = fread(buf + len, 1, cap - len - 1, fp)) > 0) {
+        len += n;
+        if (len + 1 >= cap) {
+            cap *= 2;
+            buf = (char *)urus_realloc(buf, cap);
+        }
+    }
+    pclose(fp);
+    buf[len] = '\0';
+    urus_str *result = urus_str_new(buf, len);
+    free(buf);
+    return result;
+}
+
+static urus_str *urus_http_post(urus_str *url, urus_str *body) {
+    char cmd[8192];
+    snprintf(cmd, sizeof(cmd), "curl -s -X POST -d \"%s\" \"%s\"", body->data, url->data);
+    FILE *fp = popen(cmd, "r");
+    if (!fp) {
+        fprintf(stderr, "Error: failed to execute curl\n");
+        return urus_str_from("");
+    }
+    size_t cap = 4096;
+    size_t len = 0;
+    char *buf = (char *)urus_alloc(cap);
+    size_t n;
+    while ((n = fread(buf + len, 1, cap - len - 1, fp)) > 0) {
+        len += n;
+        if (len + 1 >= cap) {
+            cap *= 2;
+            buf = (char *)urus_realloc(buf, cap);
+        }
+    }
+    pclose(fp);
+    buf[len] = '\0';
+    urus_str *result = urus_str_new(buf, len);
+    free(buf);
+    return result;
+}
+
 #endif

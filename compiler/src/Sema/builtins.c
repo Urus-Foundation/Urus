@@ -67,6 +67,10 @@ void sema_register_builtins(SemaScope *global) {
     add_builtin(global, "write_file",  T_VOID, 2, "path", T_STR, "content", T_STR);
     add_builtin(global, "append_file", T_VOID, 2, "path", T_STR, "content", T_STR);
 
+    // HTTP
+    add_builtin(global, "http_get",  T_STR,  1, "url", T_STR);
+    add_builtin(global, "http_post", T_STR,  2, "url", T_STR, "body", T_STR);
+
     add_builtin(global, "exit",   T_VOID, 1, "code", T_INT);
     add_builtin(global, "assert", T_VOID, 2, "cond", T_BOOL, "msg", T_STR);
 
