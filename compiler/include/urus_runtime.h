@@ -548,11 +548,26 @@ static void urus_assert(bool cond, urus_str *msg) {
 // On Unix, we use popen with curl
 #endif
 
+static bool urus_http_validate_input(const char *s) {
+    for (const char *p = s; *p; p++) {
+        if (*p == '"' || *p == '`' || *p == '$' || *p == ';' ||
+            *p == '|' || *p == '&' || *p == '\\' || *p == '\n' || *p == '\r') {
+            return false;
+        }
+    }
+    return true;
+}
+
 static urus_str *urus_http_get(urus_str *url) {
-    // Use popen + curl as portable fallback
-    char cmd[4096];
-    snprintf(cmd, sizeof(cmd), "curl -s \"%s\"", url->data);
+    if (!urus_http_validate_input(url->data)) {
+        fprintf(stderr, "Error: http_get URL contains unsafe characters\n");
+        return urus_str_from("");
+    }
+    size_t cmd_len = url->len + 32;
+    char *cmd = (char *)urus_alloc(cmd_len);
+    snprintf(cmd, cmd_len, "curl -s \"%s\"", url->data);
     FILE *fp = popen(cmd, "r");
+    free(cmd);
     if (!fp) {
         fprintf(stderr, "Error: failed to execute curl\n");
         return urus_str_from("");
@@ -576,9 +591,15 @@ static urus_str *urus_http_get(urus_str *url) {
 }
 
 static urus_str *urus_http_post(urus_str *url, urus_str *body) {
-    char cmd[8192];
-    snprintf(cmd, sizeof(cmd), "curl -s -X POST -d \"%s\" \"%s\"", body->data, url->data);
+    if (!urus_http_validate_input(url->data) || !urus_http_validate_input(body->data)) {
+        fprintf(stderr, "Error: http_post URL or body contains unsafe characters\n");
+        return urus_str_from("");
+    }
+    size_t cmd_len = url->len + body->len + 64;
+    char *cmd = (char *)urus_alloc(cmd_len);
+    snprintf(cmd, cmd_len, "curl -s -X POST -d \"%s\" \"%s\"", body->data, url->data);
     FILE *fp = popen(cmd, "r");
+    free(cmd);
     if (!fp) {
         fprintf(stderr, "Error: failed to execute curl\n");
         return urus_str_from("");

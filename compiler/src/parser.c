@@ -400,8 +400,8 @@ static AstNode *parse_primary(Parser *p) {
                     }
 
                     // Build expanded token stream: substitute params with arg tokens
-                    int exp_cap = rune->body_token_count * 2 + 16;
-                    Token *expanded = malloc(sizeof(Token) * (size_t)exp_cap);
+                    size_t exp_cap = (size_t)rune->body_token_count * 2 + 16;
+                    Token *expanded = malloc(sizeof(Token) * exp_cap);
                     int exp_count = 0;
 
                     for (int i = 0; i < rune->body_token_count; i++) {
@@ -412,10 +412,10 @@ static AstNode *parse_primary(Parser *p) {
                                 if (bt.length == strlen(rune->param_names[j]) &&
                                     memcmp(bt.start, rune->param_names[j], bt.length) == 0) {
                                     // Replace this token with the argument's tokens
-                                    int needed = exp_count + arg_lens[j] + 1;
+                                    size_t needed = (size_t)exp_count + (size_t)arg_lens[j] + 1;
                                     if (needed >= exp_cap) {
                                         exp_cap = needed * 2;
-                                        expanded = realloc(expanded, sizeof(Token) * (size_t)exp_cap);
+                                        expanded = realloc(expanded, sizeof(Token) * exp_cap);
                                     }
                                     for (int k = 0; k < arg_lens[j]; k++) {
                                         expanded[exp_count++] = arg_tokens[j][k];
@@ -426,18 +426,18 @@ static AstNode *parse_primary(Parser *p) {
                             }
                         }
                         if (!substituted) {
-                            if (exp_count >= exp_cap) {
+                            if ((size_t)exp_count >= exp_cap) {
                                 exp_cap *= 2;
-                                expanded = realloc(expanded, sizeof(Token) * (size_t)exp_cap);
+                                expanded = realloc(expanded, sizeof(Token) * exp_cap);
                             }
                             expanded[exp_count++] = bt;
                         }
                     }
 
                     // Add EOF token
-                    if (exp_count >= exp_cap) {
+                    if ((size_t)exp_count >= exp_cap) {
                         exp_cap++;
-                        expanded = realloc(expanded, sizeof(Token) * (size_t)exp_cap);
+                        expanded = realloc(expanded, sizeof(Token) * exp_cap);
                     }
                     Token eof_tok = {TOK_EOF, "", 0, t.line, t.col};
                     expanded[exp_count++] = eof_tok;

@@ -437,6 +437,7 @@ static void gen_expr(CodeBuf *buf, AstNode *node) {
         break;
     case NODE_BINARY:
         if ((node->as.binary.op == TOK_EQ || node->as.binary.op == TOK_NEQ) &&
+                node->as.binary.left->resolved_type &&
                 node->as.binary.left->resolved_type->kind == TYPE_STR) {
             emit(buf, "(%surus_%s_equal(", node->as.binary.op == TOK_EQ ? "" : "!",
                     ast_type_str(node->as.binary.left->resolved_type));
@@ -747,7 +748,8 @@ static int gen_expr_pre(CodeBuf *buf, AstNode *node) {
             emit(buf, "_urus_en_%d->data.%s.f%d = ", tmp, vname, i);
             gen_expr(buf, node->as.enum_init.args[i]);
             emit(buf, ";\n");
-            if (type_needs_rc(node->as.enum_init.args[i]->resolved_type) &&
+            if (node->as.enum_init.args[i]->resolved_type &&
+                    type_needs_rc(node->as.enum_init.args[i]->resolved_type) &&
                     node->as.enum_init.args[i]->kind == NODE_IDENT) {
                 emit_indent(buf);
                 emit(buf, "%s = NULL; // move to enum variant\n", node->as.enum_init.args[i]->as.ident.name);
