@@ -114,8 +114,32 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node) {
             return set_type(node, ast_type_simple(TYPE_STR));
         }
 
+        if (op == TOK_AMP || op == TOK_PIPE || op == TOK_CARET ||
+            op == TOK_SHL || op == TOK_SHR || op == TOK_AMP_TILDE) {
+            if (lt->kind != TYPE_INT) {
+                sema_error(ctx, &node->tok, "bitwise operator '%s' requires int, got '%s'",
+                           token_type_name(op), ast_type_str(lt));
+            }
+            if (rt->kind != TYPE_INT) {
+                sema_error(ctx, &node->tok, "bitwise operator '%s' requires int, got '%s'",
+                           token_type_name(op), ast_type_str(rt));
+            }
+            return set_type(node, ast_type_simple(TYPE_INT));
+        }
+
+        if (op == TOK_STARSTAR) {
+            if (!ast_types_equal(lt, rt)) {
+                sema_error(ctx, &node->tok, "mismatched types in '**': '%s' and '%s'",
+                           ast_type_str(lt), ast_type_str(rt));
+            }
+            if (lt->kind != TYPE_INT && lt->kind != TYPE_FLOAT) {
+                sema_error(ctx, &node->tok, "'**' requires numeric types, got '%s'", ast_type_str(lt));
+            }
+            return set_type(node, ast_type_clone(lt));
+        }
+
         if (op == TOK_PLUS || op == TOK_MINUS || op == TOK_STAR ||
-            op == TOK_SLASH || op == TOK_PERCENT) {
+            op == TOK_SLASH || op == TOK_PERCENT || op == TOK_PERCENT_PERCENT) {
             if (!ast_types_equal(lt, rt)) {
                 sema_error(ctx, &node->tok, "mismatched types in '%s': '%s' and '%s'",
                            token_type_name(op), ast_type_str(lt), ast_type_str(rt));
@@ -145,6 +169,12 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node) {
                 sema_error(ctx, &node->as.unary.operand->tok, "unary '-' requires numeric type, got '%s'", ast_type_str(t));
             }
             return set_type(node, ast_type_clone(t));
+        }
+        if (node->as.unary.op == TOK_TILDE) {
+            if (t->kind != TYPE_INT) {
+                sema_error(ctx, &node->as.unary.operand->tok, "'~' requires int, got '%s'", ast_type_str(t));
+            }
+            return set_type(node, ast_type_simple(TYPE_INT));
         }
         return set_type(node, ast_type_clone(t));
     }

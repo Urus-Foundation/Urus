@@ -64,6 +64,20 @@ typedef enum {
     TOK_SLASH_EQ,   // /=
     TOK_PLUSPLUS,    // ++
     TOK_MINUSMINUS, // --
+    TOK_STARSTAR,   // **
+    TOK_PERCENT_PERCENT, // %%
+    TOK_AMP,        // & (bitwise and)
+    TOK_CARET,      // ^
+    TOK_TILDE,      // ~
+    TOK_SHL,        // <<
+    TOK_SHR,        // >>
+    TOK_AMP_TILDE,  // &~
+    TOK_PERCENT_EQ, // %=
+    TOK_AMP_EQ,     // &=
+    TOK_PIPE_EQ,    // |=
+    TOK_CARET_EQ,   // ^=
+    TOK_SHL_EQ,     // <<=
+    TOK_SHR_EQ,     // >>=
     TOK_DOTDOT,     // ..
     TOK_DOTDOTEQ,   // ..=
     TOK_ARROW,      // =>

@@ -231,7 +231,10 @@ Token lexer_next(Lexer *l) {
     case ',': return make_token(l, TOK_COMMA, start, 1);
     case ':': return make_token(l, TOK_COLON, start, 1);
     case ';': return make_token(l, TOK_SEMICOLON, start, 1);
-    case '%': return make_token(l, TOK_PERCENT, start, 1);
+    case '%':
+        if (peek(l) == '%') { advance(l); return make_token(l, TOK_PERCENT_PERCENT, start, 2); }
+        if (peek(l) == '=') { advance(l); return make_token(l, TOK_PERCENT_EQ, start, 2); }
+        return make_token(l, TOK_PERCENT, start, 1);
     case '+':
         if (peek(l) == '+') { advance(l); return make_token(l, TOK_PLUSPLUS, start, 2); }
         if (peek(l) == '=') { advance(l); return make_token(l, TOK_PLUS_EQ, start, 2); }
@@ -241,6 +244,7 @@ Token lexer_next(Lexer *l) {
         if (peek(l) == '=') { advance(l); return make_token(l, TOK_MINUS_EQ, start, 2); }
         return make_token(l, TOK_MINUS, start, 1);
     case '*':
+        if (peek(l) == '*') { advance(l); return make_token(l, TOK_STARSTAR, start, 2); }
         if (peek(l) == '=') { advance(l); return make_token(l, TOK_STAR_EQ, start, 2); }
         return make_token(l, TOK_STAR, start, 1);
     case '/':
@@ -254,17 +258,32 @@ Token lexer_next(Lexer *l) {
         if (peek(l) == '=') { advance(l); return make_token(l, TOK_NEQ, start, 2); }
         return make_token(l, TOK_NOT, start, 1);
     case '<':
+        if (peek(l) == '<') { advance(l);
+            if (peek(l) == '=') { advance(l); return make_token(l, TOK_SHL_EQ, start, 3); }
+            return make_token(l, TOK_SHL, start, 2);
+        }
         if (peek(l) == '=') { advance(l); return make_token(l, TOK_LTE, start, 2); }
         return make_token(l, TOK_LT, start, 1);
     case '>':
+        if (peek(l) == '>') { advance(l);
+            if (peek(l) == '=') { advance(l); return make_token(l, TOK_SHR_EQ, start, 3); }
+            return make_token(l, TOK_SHR, start, 2);
+        }
         if (peek(l) == '=') { advance(l); return make_token(l, TOK_GTE, start, 2); }
         return make_token(l, TOK_GT, start, 1);
     case '&':
         if (peek(l) == '&') { advance(l); return make_token(l, TOK_AND, start, 2); }
-        return error_token(l, "unexpected '&'");
+        if (peek(l) == '~') { advance(l); return make_token(l, TOK_AMP_TILDE, start, 2); }
+        if (peek(l) == '=') { advance(l); return make_token(l, TOK_AMP_EQ, start, 2); }
+        return make_token(l, TOK_AMP, start, 1);
     case '|':
         if (peek(l) == '|') { advance(l); return make_token(l, TOK_OR, start, 2); }
+        if (peek(l) == '=') { advance(l); return make_token(l, TOK_PIPE_EQ, start, 2); }
         return make_token(l, TOK_PIPE, start, 1);
+    case '^':
+        if (peek(l) == '=') { advance(l); return make_token(l, TOK_CARET_EQ, start, 2); }
+        return make_token(l, TOK_CARET, start, 1);
+    case '~': return make_token(l, TOK_TILDE, start, 1);
     case '.':
         if (peek(l) == '.') {
             advance(l);
@@ -356,6 +375,20 @@ const char *token_type_name(TokenType type) {
     case TOK_SLASH_EQ: return "SLASH_EQ";
     case TOK_PLUSPLUS: return "PLUSPLUS";
     case TOK_MINUSMINUS: return "MINUSMINUS";
+    case TOK_STARSTAR: return "STARSTAR";
+    case TOK_PERCENT_PERCENT: return "PERCENT_PERCENT";
+    case TOK_AMP: return "AMP";
+    case TOK_CARET: return "CARET";
+    case TOK_TILDE: return "TILDE";
+    case TOK_SHL: return "SHL";
+    case TOK_SHR: return "SHR";
+    case TOK_AMP_TILDE: return "AMP_TILDE";
+    case TOK_PERCENT_EQ: return "PERCENT_EQ";
+    case TOK_AMP_EQ: return "AMP_EQ";
+    case TOK_PIPE_EQ: return "PIPE_EQ";
+    case TOK_CARET_EQ: return "CARET_EQ";
+    case TOK_SHL_EQ: return "SHL_EQ";
+    case TOK_SHR_EQ: return "SHR_EQ";
     case TOK_DOTDOT: return "DOTDOT";
     case TOK_DOTDOTEQ: return "DOTDOTEQ";
     case TOK_LPAREN: return "LPAREN";

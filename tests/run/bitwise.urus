@@ -1,0 +1,53 @@
+fn main(): void {
+    // Bitwise AND
+    print(to_str(12 & 10));
+
+    // Bitwise OR
+    print(to_str(12 | 10));
+
+    // Bitwise XOR
+    print(to_str(12 ^ 10));
+
+    // Bitwise NOT
+    print(to_str(~0));
+
+    // Left shift
+    print(to_str(1 << 4));
+
+    // Right shift
+    print(to_str(16 >> 2));
+
+    // AND-NOT
+    print(to_str(15 &~ 3));
+
+    // Exponent
+    print(to_str(2 ** 10));
+
+    // Floored remainder
+    print(to_str(-7 %% 3));
+
+    // Compound assignments
+    let mut x: int = 255;
+    x &= 15;
+    print(to_str(x));
+
+    let mut y: int = 1;
+    y <<= 8;
+    print(to_str(y));
+
+    let mut z: int = 10;
+    z |= 5;
+    print(to_str(z));
+
+    let mut w: int = 15;
+    w ^= 6;
+    print(to_str(w));
+
+    let mut v: int = 512;
+    v >>= 3;
+    print(to_str(v));
+
+    let mut m: int = 17;
+    m %= 5;
+    print(to_str(m));
+}

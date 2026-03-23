@@ -350,6 +350,7 @@ static const char *binop_str(TokenType op) {
     case TOK_STAR:    return "*";
     case TOK_SLASH:   return "/";
     case TOK_PERCENT: return "%";
+    case TOK_PERCENT_PERCENT: return "%"; // floored mod handled specially
     case TOK_EQ:      return "==";
     case TOK_NEQ:     return "!=";
     case TOK_LT:      return "<";
@@ -358,6 +359,12 @@ static const char *binop_str(TokenType op) {
     case TOK_GTE:     return ">=";
     case TOK_AND:     return "&&";
     case TOK_OR:      return "||";
+    case TOK_AMP:     return "&";
+    case TOK_PIPE:    return "|";
+    case TOK_CARET:   return "^";
+    case TOK_SHL:     return "<<";
+    case TOK_SHR:     return ">>";
+    case TOK_AMP_TILDE: return "&~"; // handled specially
     default: return "?";
     }
 }
@@ -446,6 +453,34 @@ static void gen_expr(CodeBuf *buf, AstNode *node) {
             emit(buf, ", ");
             gen_expr(buf, node->as.binary.right);
             emit(buf, ")");
+        } else if (node->as.binary.op == TOK_STARSTAR) {
+            // exponent: a ** b -> pow((double)a, (double)b) or integer cast
+            bool is_int = node->as.binary.left->resolved_type &&
+                          node->as.binary.left->resolved_type->kind == TYPE_INT;
+            if (is_int) emit(buf, "(int64_t)");
+            emit(buf, "pow((double)");
+            gen_expr(buf, node->as.binary.left);
+            emit(buf, ", (double)");
+            gen_expr(buf, node->as.binary.right);
+            emit(buf, ")");
+        } else if (node->as.binary.op == TOK_PERCENT_PERCENT) {
+            // floored remainder: ((a % b) + b) % b
+            emit(buf, "((");
+            gen_expr(buf, node->as.binary.left);
+            emit(buf, " %% ");
+            gen_expr(buf, node->as.binary.right);
+            emit(buf, " + ");
+            gen_expr(buf, node->as.binary.right);
+            emit(buf, ") %% ");
+            gen_expr(buf, node->as.binary.right);
+            emit(buf, ")");
+        } else if (node->as.binary.op == TOK_AMP_TILDE) {
+            // and-not: a &~ b -> (a & ~b)
+            emit(buf, "(");
+            gen_expr(buf, node->as.binary.left);
+            emit(buf, " & ~");
+            gen_expr(buf, node->as.binary.right);
+            emit(buf, ")");
         } else {
             emit(buf, "(");
             gen_expr(buf, node->as.binary.left);
@@ -456,7 +491,8 @@ static void gen_expr(CodeBuf *buf, AstNode *node) {
         break;
     case NODE_UNARY:
         emit(buf, "(");
-        emit(buf, "%s", node->as.unary.op == TOK_NOT ? "!" : "-");
+        emit(buf, "%s", node->as.unary.op == TOK_NOT ? "!" :
+                         node->as.unary.op == TOK_TILDE ? "~" : "-");
         gen_expr(buf, node->as.unary.operand);
         emit(buf, ")");
         break;
@@ -886,10 +922,16 @@ static void gen_stmt(CodeBuf *buf, AstNode *node) {
             gen_expr(buf, node->as.assign_stmt.target);
             const char *op = "=";
             switch (node->as.assign_stmt.op) {
-            case TOK_PLUS_EQ:  op = "+="; break;
-            case TOK_MINUS_EQ: op = "-="; break;
-            case TOK_STAR_EQ:  op = "*="; break;
-            case TOK_SLASH_EQ: op = "/="; break;
+            case TOK_PLUS_EQ:    op = "+="; break;
+            case TOK_MINUS_EQ:   op = "-="; break;
+            case TOK_STAR_EQ:    op = "*="; break;
+            case TOK_SLASH_EQ:   op = "/="; break;
+            case TOK_PERCENT_EQ: op = "%="; break;
+            case TOK_AMP_EQ:     op = "&="; break;
+            case TOK_PIPE_EQ:    op = "|="; break;
+            case TOK_CARET_EQ:   op = "^="; break;
+            case TOK_SHL_EQ:     op = "<<="; break;
+            case TOK_SHR_EQ:     op = ">>="; break;
             default: break;
             }
             emit(buf, " %s ", op);

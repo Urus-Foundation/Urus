@@ -707,7 +707,7 @@ static AstNode *parse_call(Parser *p) {
 }
 
 static AstNode *parse_unary(Parser *p) {
-    if (match(p, TOK_NOT) || match(p, TOK_MINUS)) {
+    if (match(p, TOK_NOT) || match(p, TOK_MINUS) || match(p, TOK_TILDE)) {
         Token op = previous(p);
         AstNode *operand = parse_unary(p);
         AstNode *n = ast_new(NODE_UNARY, op);
@@ -740,9 +740,14 @@ static AstNode *parse_binary(Parser *p, AstNode *(*sub)(Parser *), int n_ops, co
     return left;
 }
 
+static AstNode *parse_exponent(Parser *p) {
+    static const TokenType ops[] = { TOK_STARSTAR };
+    return parse_binary(p, parse_unary, 1, ops);
+}
+
 static AstNode *parse_multiplication(Parser *p) {
-    static const TokenType ops[] = { TOK_STAR, TOK_SLASH, TOK_PERCENT };
-    return parse_binary(p, parse_unary, 3, ops);
+    static const TokenType ops[] = { TOK_STAR, TOK_SLASH, TOK_PERCENT, TOK_PERCENT_PERCENT };
+    return parse_binary(p, parse_exponent, 4, ops);
 }
 
 static AstNode *parse_addition(Parser *p) {
@@ -750,9 +755,14 @@ static AstNode *parse_addition(Parser *p) {
     return parse_binary(p, parse_multiplication, 2, ops);
 }
 
+static AstNode *parse_shift(Parser *p) {
+    static const TokenType ops[] = { TOK_SHL, TOK_SHR };
+    return parse_binary(p, parse_addition, 2, ops);
+}
+
 static AstNode *parse_comparison(Parser *p) {
     static const TokenType ops[] = { TOK_LT, TOK_GT, TOK_LTE, TOK_GTE };
-    return parse_binary(p, parse_addition, 4, ops);
+    return parse_binary(p, parse_shift, 4, ops);
 }
 
 static AstNode *parse_equality(Parser *p) {
@@ -760,9 +770,24 @@ static AstNode *parse_equality(Parser *p) {
     return parse_binary(p, parse_comparison, 2, ops);
 }
 
+static AstNode *parse_bitwise_and(Parser *p) {
+    static const TokenType ops[] = { TOK_AMP, TOK_AMP_TILDE };
+    return parse_binary(p, parse_equality, 2, ops);
+}
+
+static AstNode *parse_bitwise_xor(Parser *p) {
+    static const TokenType ops[] = { TOK_CARET };
+    return parse_binary(p, parse_bitwise_and, 1, ops);
+}
+
+static AstNode *parse_bitwise_or(Parser *p) {
+    static const TokenType ops[] = { TOK_PIPE };
+    return parse_binary(p, parse_bitwise_xor, 1, ops);
+}
+
 static AstNode *parse_logic_and(Parser *p) {
     static const TokenType ops[] = { TOK_AND };
-    return parse_binary(p, parse_equality, 1, ops);
+    return parse_binary(p, parse_bitwise_or, 1, ops);
 }
 
 static AstNode *parse_logic_or(Parser *p) {
@@ -957,7 +982,9 @@ static bool is_lvalue(AstNode *n) {
 
 static bool is_assign_op(TokenType t) {
     return t == TOK_ASSIGN || t == TOK_PLUS_EQ || t == TOK_MINUS_EQ ||
-           t == TOK_STAR_EQ || t == TOK_SLASH_EQ;
+           t == TOK_STAR_EQ || t == TOK_SLASH_EQ || t == TOK_PERCENT_EQ ||
+           t == TOK_AMP_EQ || t == TOK_PIPE_EQ || t == TOK_CARET_EQ ||
+           t == TOK_SHL_EQ || t == TOK_SHR_EQ;
 }
 
 static AstNode *parse_match(Parser *p) {
