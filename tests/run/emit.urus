@@ -1,0 +1,6 @@
+fn main(): void {
+    __emit__ {
+        printf("Hello from c!\n");
+    }
+    print("Hello from urus!");
+}

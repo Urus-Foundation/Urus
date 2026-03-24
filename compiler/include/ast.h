@@ -59,6 +59,7 @@ typedef enum {
     NODE_BREAK_STMT,
     NODE_CONTINUE_STMT,
     NODE_EXPR_STMT,
+    NODE_EMIT_STMT,
     NODE_MATCH,
 
     // Expressions
@@ -203,6 +204,9 @@ struct AstNode {
 
         // NODE_EXPR_STMT
         struct { AstNode *expr; } expr_stmt;
+
+        // NODE_EMIT_STMT
+        struct { char *content; bool is_toplevel; } emit_stmt;
 
         // NODE_BINARY
         struct { AstNode *left; TokenType op; AstNode *right; } binary;

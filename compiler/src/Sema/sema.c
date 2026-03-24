@@ -778,6 +778,10 @@ static void check_stmt(SemaCtx *ctx, AstNode *node) {
         check_expr(ctx, node->as.expr_stmt.expr);
         break;
 
+    case NODE_EMIT_STMT:
+        // Raw emit; No check. Trust the author.
+        break;
+
     case NODE_BLOCK:
         check_block(ctx, node);
         break;
