@@ -1094,6 +1094,12 @@ static void gen_stmt(CodeBuf *buf, AstNode *node) {
         gen_expr(buf, node->as.expr_stmt.expr);
         emit(buf, ";\n");
         break;
+    case NODE_EMIT_STMT:
+        emit_indent(buf);
+        emit(buf, "/* raw emit block statement */\n");
+        emit_indent(buf);
+        emit(buf, "%s\n", node->as.emit_stmt.content);
+        break;
     case NODE_BLOCK:
         gen_block(buf, node);
         emit(buf, "\n");
@@ -1232,12 +1238,21 @@ void codegen_generate(CodeBuf *buf, AstNode *program) {
     emit(buf, "%.*s\n", urus_runtime_header_data_len, urus_runtime_header_data);
     emit(buf, "\n\n/* +---+ Program start +---+ */\n\n");
 
-    // Pass 0: collect and emit tuple typedefs
+    // Pass 0: emit raw toplevel emit block
+    for (int i = 0; i < program->as.program.decl_count; i++) {
+        AstNode *d = program->as.program.decls[i];
+        if (d->kind == NODE_EMIT_STMT && d->as.emit_stmt.is_toplevel) {
+            emit(buf, "/* toplevel raw emit block statement */\n");
+            emit(buf, "%s\n", d->as.emit_stmt.content);
+        }
+    }
+
+    // Pass 1b: collect and emit tuple typedefs
     tuple_typedef_count = 0;
     collect_and_emit_tuple_typedefs(buf, program);
     if (tuple_typedef_count > 0) emit(buf, "\n");
 
-    // Pass 1: struct and enum forward declarations
+    // Pass 1c: struct and enum forward declarations
     for (int i = 0; i < program->as.program.decl_count; i++) {
         AstNode *d = program->as.program.decls[i];
         if (d->kind == NODE_STRUCT_DECL) {

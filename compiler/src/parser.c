@@ -1052,6 +1052,40 @@ static AstNode *parse_match(Parser *p) {
     return n;
 }
 
+static AstNode *parse_emit(Parser *p, bool is_toplevel) {
+    Token emit_tok = expect(p, TOK_EMIT, "expected 'emit'");
+    expect(p, TOK_LBRACE, "expected '{'");
+
+    // take raw content
+    const char *body_start = NULL;
+    int depth = 1;
+    if (p->pos < p->count) {
+        body_start = p->tokens[p->pos].start;
+    }
+    while (!at_end(p) && depth > 0) {
+        if (check(p, TOK_LBRACE)) depth++;
+        else if (check(p, TOK_RBRACE)) { depth--; if (depth == 0) break; }
+        advance_tok(p);
+    }
+
+    const char *body_end = p->tokens[p->pos].start;
+    char *raw_content = NULL;
+    if (body_start && body_end >= body_start) {
+        size_t len = (size_t)(body_end - body_start);
+        raw_content = malloc(len + 1);
+        memcpy(raw_content, body_start, len);
+        raw_content[len] = '\0';
+    } else {
+        raw_content = strdup("");
+    }
+    expect(p, TOK_RBRACE, "expected '}'");
+
+    AstNode *n = ast_new(NODE_EMIT_STMT, emit_tok);
+    n->as.emit_stmt.content = raw_content;
+    n->as.emit_stmt.is_toplevel = is_toplevel;
+    return n;
+}
+
 static AstNode *parse_statement(Parser *p) {
     if (check(p, TOK_LET)) return parse_let(p);
     if (check(p, TOK_IF)) return parse_if(p);
@@ -1059,6 +1093,7 @@ static AstNode *parse_statement(Parser *p) {
     if (check(p, TOK_DO)) return parse_do_while(p);
     if (check(p, TOK_FOR)) return parse_for(p);
     if (check(p, TOK_MATCH)) return parse_match(p);
+    if (check(p, TOK_EMIT)) return parse_emit(p, false);
     if (check(p, TOK_RETURN)) return parse_return(p);
     if (match(p, TOK_BREAK)) {
         expect(p, TOK_SEMICOLON, "expected ';' after break");
@@ -1380,6 +1415,7 @@ static AstNode *parse_declaration(Parser *p) {
     if (check(p, TOK_RUNE)) return parse_rune_decl(p);
     if (check(p, TOK_CONST)) return parse_const_decl(p);
     if (check(p, TOK_TYPE)) return parse_type_alias(p);
+    if (check(p, TOK_EMIT)) return parse_emit(p,true);
     return parse_statement(p);
 }
 

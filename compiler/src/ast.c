@@ -315,6 +315,10 @@ void ast_print(AstNode *node, int ind) {
         ast_print(node->as.expr_stmt.expr, ind + 1);
         break;
 
+    case NODE_EMIT_STMT:
+        printf("EmitStmt(toplevel=%s)\n", node->as.emit_stmt.is_toplevel ? "true" : "false");
+        break;
+
     case NODE_BINARY:
         printf("Binary '%s'\n", token_type_name(node->as.binary.op));
         ast_print(node->as.binary.left, ind + 1);
@@ -559,6 +563,9 @@ void ast_free(AstNode *node) {
         break;
     case NODE_EXPR_STMT:
         ast_free(node->as.expr_stmt.expr);
+        break;
+    case NODE_EMIT_STMT:
+        free(node->as.emit_stmt.content);
         break;
     case NODE_BINARY:
         ast_free(node->as.binary.left);
