@@ -267,7 +267,7 @@ struct AstNode {
         } enum_init;
 
         // NODE_IMPORT
-        struct { char *path; } import_decl;
+        struct { char *path; bool is_stdlib; } import_decl;
 
         // NODE_OK_EXPR / NODE_ERR_EXPR
         struct { AstNode *value; } result_expr;

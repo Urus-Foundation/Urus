@@ -1304,10 +1304,23 @@ static AstNode *parse_enum_decl(Parser *p) {
 
 static AstNode *parse_import(Parser *p) {
     Token import_tok = expect(p, TOK_IMPORT, "expected 'import'");
-    Token path = expect(p, TOK_STR_LIT, "expected module path string");
-    expect(p, TOK_SEMICOLON, "expected ';' after import");
     AstNode *n = ast_new(NODE_IMPORT, import_tok);
-    n->as.import_decl.path = tok_str_value(path);
+
+    if (check(p, TOK_STR_LIT)) {
+        // import "relative/path.urus"
+        Token path = advance_tok(p);
+        n->as.import_decl.path = tok_str_value(path);
+        n->as.import_decl.is_stdlib = false;
+    } else if (check(p, TOK_IDENT)) {
+        // import module_name
+        Token module_name = advance_tok(p);
+        n->as.import_decl.path = tok_str(module_name); // store raw name (e.g "math")
+        n->as.import_decl.is_stdlib = true;
+    } else {
+        error_at(p, current(p), "expected \"FILENAME\" or MODULE_NAME after import");
+    }
+
+    expect(p, TOK_SEMICOLON, "expected ';' after import");
     return n;
 }
 
