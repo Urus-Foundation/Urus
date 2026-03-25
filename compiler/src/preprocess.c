@@ -22,6 +22,19 @@ static bool already_imported(const char *path) {
     return false;
 }
 
+// TODO: Add check if path is same with URUSCPATH even though is using "../"
+static bool is_path_allowed(char *path) {
+    char *p = path;
+    while (*p) {
+        while (*p == '/' || *p == '\\') p++;
+        const char *start = p;
+        while (*p && *p != '/' && *p != '\\') p++;
+        size_t len = (size_t)(p - start);
+        if (len == 2 && start[0] == '.' && start[1] == '.') return false;
+    }
+    return true;
+}
+
 void get_local_libpath(char *out, size_t size) {
 
 #if defined(_WIN32)
@@ -73,7 +86,7 @@ static char *resolve_stdlib_path(const char *module_name) {
     size_t base_len = strlen(urus_path);
     size_t name_len = strlen(module_name);
     // +1 for sep, +5 for ".urus", +1 for '\0'
-    char *full = malloc(base_len + 1 + name_len + 5 + 1);
+    char *full = xmalloc(base_len + 1 + name_len + 5 + 1);
     sprintf(full, "%s%c%s.urus", urus_path, URUSC_PATHSEP, module_name);
 
     return full;
@@ -93,7 +106,7 @@ static char *resolve_import_path(const char *base_file, const char *import_path)
 
     size_t dir_len = (size_t)(last_sep - base_file + 1);
     size_t imp_len = strlen(import_path);
-    char *full = malloc(dir_len + imp_len + 1);
+    char *full = xmalloc(dir_len + imp_len + 1);
     memcpy(full, base_file, dir_len);
     memcpy(full + dir_len, import_path, imp_len);
     full[dir_len + imp_len] = '\0';
@@ -101,6 +114,11 @@ static char *resolve_import_path(const char *base_file, const char *import_path)
 }
 
 bool preprocess_imports(AstNode *program, const char *base_file) {
+    if (import_count >= MAX_IMPORTS) {
+        fprintf(stderr, "Error: too many imports (max %d)\n", MAX_IMPORTS);
+        return false;
+    }
+
     // Mark base file as imported (to prevent circular self-import)
     imported_files[import_count++] = base_file;
 
@@ -114,16 +132,22 @@ bool preprocess_imports(AstNode *program, const char *base_file) {
             path = resolve_stdlib_path(d->as.import_decl.path);
         } else {
             path = resolve_import_path(base_file, d->as.import_decl.path);
+            if (!is_path_allowed(path)) {
+                fprintf(stderr, "Error: import path '%s' resolves outside allowed directories\n",
+                        d->as.import_decl.path);
+                xfree(path);
+                return false;
+            }
         }
 
         if (already_imported(path)) {
-            free(path);
+            xfree(path);
             continue;
         }
 
-        if (import_count >= MAX_IMPORTS) {
+        if (import_count + 1 >= MAX_IMPORTS) {
             fprintf(stderr, "Error: too many imports (max %d)\n", MAX_IMPORTS);
-            free(path);
+            xfree(path);
             return false;
         }
         imported_files[import_count++] = path;
@@ -141,7 +165,7 @@ bool preprocess_imports(AstNode *program, const char *base_file) {
         int token_count;
         Token *tokens = lexer_tokenize(&lexer, &token_count);
         if (!tokens) {
-            free(source);
+            xfree(source);
             return false;
         }
 
@@ -153,22 +177,22 @@ bool preprocess_imports(AstNode *program, const char *base_file) {
         if (parser.had_error) {
             fprintf(stderr, "Error parsing imported file '%s'\n", path);
             ast_free(imported);
-            free(tokens);
-            free(source);
+            xfree(tokens);
+            xfree(source);
             return false;
         }
 
         // Recursively process imports in the imported file
         if (!preprocess_imports(imported, path)) {
             ast_free(imported);
-            free(tokens);
-            free(source);
+            xfree(tokens);
+            xfree(source);
             return false;
         }
 
         // Merge imported declarations into program (insert before current position)
         int new_count = program->as.program.decl_count + imported->as.program.decl_count - 1;
-        AstNode **new_decls = malloc(sizeof(AstNode *) * (size_t)(new_count + 1));
+        AstNode **new_decls = xmalloc(sizeof(AstNode *) * (size_t)(new_count + 1));
 
         int pos = 0;
         // Copy declarations before the import statement
@@ -189,16 +213,16 @@ bool preprocess_imports(AstNode *program, const char *base_file) {
             new_decls[pos++] = program->as.program.decls[j];
         }
 
-        free(program->as.program.decls);
+        xfree(program->as.program.decls);
         program->as.program.decls = new_decls;
         program->as.program.decl_count = pos;
 
         // Don't free imported->decls since we transferred ownership
-        free(imported->as.program.decls);
+        xfree(imported->as.program.decls);
         imported->as.program.decls = NULL;
         imported->as.program.decl_count = 0;
         ast_free(imported);
-        free(tokens);
+        xfree(tokens);
         // Note: source memory is borrowed by tokens, don't free yet
 
         // Re-scan from beginning since we modified the array
