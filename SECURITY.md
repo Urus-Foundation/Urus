@@ -4,9 +4,9 @@
 
 | Version | Supported |
 |---------|-----------|
-| V0.2/2  | Yes (current) |
-| V0.2/1  | Yes       |
-| V0.1    | No        |
+| 0.3.x   | Yes (current) |
+| 0.2.x   | Security fixes only |
+| 0.1     | No |
 
 ## Reporting a Vulnerability
 
@@ -40,21 +40,23 @@ The following are in scope for security reports:
 | **Runtime** | Memory corruption, bounds check bypass, ref-count manipulation |
 | **Generated code** | Codegen producing unsafe C, missing bounds checks |
 | **Import system** | Path traversal, unintended file access |
+| **HTTP built-ins** | Request injection, unsafe URL handling in `http_get`/`http_post` |
 
 The following are **out of scope**:
 
-- Vulnerabilities in GCC itself
+- Vulnerabilities in GCC/Clang itself
 - Issues in user-written URUS programs (e.g., logic bugs)
 - Denial of service via extremely large input files (known limitation)
 
 ## Security Design
 
-For details on URUS's security model, memory safety, and known limitations, see the [Security Documentation](./documentation/security/).
-
 ### Key Points
 
 - **Memory safety:** Automatic reference counting with runtime bounds checking
 - **Type safety:** All types verified at compile time, no implicit coercion
-- **No unsafe operations:** No pointer arithmetic, no manual memory management in user code
+- **No unsafe operations:** No pointer arithmetic, no manual memory management in user code (except via `__emit__`)
 - **Immutable by default:** Variables require explicit `mut` for mutation
-- **No network access:** The compiler and runtime have no networking capabilities
+- **HTTP access:** `http_get()` and `http_post()` built-ins use `curl` — network access is opt-in per function call
+- **Raw emit:** `__emit__()` allows inline C code and bypasses all safety checks — use with caution
+
+For more details, see the [Security Model](./documentation/security/security-model.md).

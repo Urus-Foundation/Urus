@@ -1,5 +1,31 @@
 # Changelog
 
+## Unreleased (since V0.3.0)
+
+### New Features
+- **Extended Pattern Matching**: `match` now works on `int`, `str`, and `bool` values with literal patterns and `_` wildcard (#117, #118)
+- **Defer Statements**: `defer { ... }` for scope-based cleanup, LIFO execution order (#112, #116)
+- **Standard Library Path**: `import` now searches `URUSCPATH` for library modules (#114)
+- **Raw Emit**: `__emit__("...")` to inline C code directly (#113)
+- **Type Aliases**: `type ID = int;` for semantic type aliasing (#110, #111)
+- **Do-While Loops**: `do { ... } while cond;` (#108, #109)
+- **Array Method Syntax**: `arr.len()`, `arr.push(x)`, `arr.pop()` (#106, #107)
+- **String Method Syntax**: `s.trim()`, `s.upper()`, `s.contains(sub)`, etc. (#104, #105)
+- **Constants**: `const MAX: int = 100;` compile-time constants (#102, #103)
+- **Bitwise Operators**: `&`, `|`, `^`, `~`, `<<`, `>>`, `&~`, plus `**` (exponent) and `%%` (floored remainder) (#99)
+- **Mutable Function Parameters**: `fn foo(mut x: int)` (#98)
+
+### Bug Fixes
+- Fixed multiple security vulnerabilities from audit (#100, #101)
+- Fixed empty `URUS_LIB_DIR` in Termux installs (#505de65)
+- Fixed garbage unused warnings for imported declarations (#fcd02f1)
+
+### Improvements
+- Runtime moved from `include/urus_runtime.h` to `runtime/urus_runtime.h`
+- Updated library installation paths and preprocess logic
+
+---
+
 ## V0.3.0 (2026-03-21)
 
 ### New Features

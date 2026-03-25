@@ -1,6 +1,8 @@
-# API Reference
+# Compiler and Runtime API
 
-URUS is a compiled language, not a library/service — so there is no REST API. This document describes the **internal compiler API** and **runtime API** available for embedding or further development.
+This document describes the internal C APIs exposed by the URUS compiler and the runtime library. These are relevant if you're embedding the compiler in another tool, extending the runtime, or working on the compiler itself.
+
+The struct layouts and function signatures shown here reflect the public API. Internal implementation details may vary — refer to the source code for exact definitions.
 
 ## Compiler C API
 
@@ -46,7 +48,7 @@ AstNode *parse_program(Parser *p);
 ### Semantic Analysis
 
 ```c
-// sema.h
+// sema.h (implementation in Sema/sema.c, Sema/builtins.c, Sema/scope.c)
 int sema_analyze(AstNode *program);
 ```
 
@@ -82,7 +84,7 @@ void codegen_generate(CodeBuf *buf, AstNode *program);
 // ast.h
 typedef enum {
     TYPE_INT, TYPE_FLOAT, TYPE_BOOL, TYPE_STR, TYPE_VOID,
-    TYPE_ARRAY, TYPE_NAMED, TYPE_RESULT, TYPE_FN,
+    TYPE_ARRAY, TYPE_NAMED, TYPE_RESULT, TYPE_FN, TYPE_TUPLE,
 } TypeKind;
 
 typedef struct AstType {
@@ -102,6 +104,7 @@ typedef struct AstType {
 | `ast_type_array(AstType*)` | `AstType*` | Create an array type `[T]` |
 | `ast_type_named(char*)` | `AstType*` | Create a named type (struct/enum) |
 | `ast_type_result(AstType*, AstType*)` | `AstType*` | Create a `Result<T, E>` |
+| `ast_type_tuple(AstType**, int)` | `AstType*` | Create a tuple type `(T1, T2, ...)` |
 
 #### Utility Functions
 
@@ -117,7 +120,7 @@ typedef struct AstType {
 
 ## Runtime API (urus_runtime.h)
 
-The URUS runtime library is **header-only** — all functions are defined directly in `urus_runtime.h`.
+The URUS runtime library is **header-only** — all functions are defined directly in `runtime/urus_runtime.h` (embedded into the compiler binary at build time).
 
 ### String Type
 
@@ -269,6 +272,15 @@ typedef struct {
 | `urus_read_file` | `(urus_str* path) → urus_str*` | Read file as string |
 | `urus_write_file` | `(urus_str* path, urus_str* content) → void` | Write string to file |
 | `urus_append_file` | `(urus_str* path, urus_str* content) → void` | Append string to file |
+
+### HTTP
+
+| Function | Signature | Description |
+|----------|-----------|-------------|
+| `urus_http_get` | `(urus_str* url) → urus_str*` | HTTP GET via curl, returns response body |
+| `urus_http_post` | `(urus_str* url, urus_str* body) → urus_str*` | HTTP POST via curl, returns response body |
+
+> Requires `curl` to be available on the system.
 
 ### Misc
 

@@ -7,8 +7,8 @@ Thank you for your interest in contributing to URUS! This guide will help you ge
 1. **Fork** the repository on GitHub
 2. **Clone** your fork locally:
    ```bash
-   git clone https://github.com/<your-username>/urus.git
-   cd urus
+   git clone https://github.com/<your-username>/Urus.git
+   cd Urus
    ```
 3. **Build** the compiler:
    ```bash
@@ -19,7 +19,12 @@ Thank you for your interest in contributing to URUS! This guide will help you ge
 4. **Run tests** to make sure everything works:
    ```bash
    cd tests
-   bash run_tests.sh ../compiler/urusc
+
+   # Linux / macOS
+   bash run_tests.sh ../compiler/build/urusc
+
+   # Windows
+   run_tests.bat ..\compiler\build\Debug\urusc.exe
    ```
 
 ## How to Contribute
@@ -28,8 +33,8 @@ Thank you for your interest in contributing to URUS! This guide will help you ge
 
 - Search [existing issues](https://github.com/Urus-Foundation/Urus/issues) first to avoid duplicates
 - Open a new issue with:
-  - URUS version (`urusc --help` shows version)
-  - OS and GCC version
+  - URUS version (`urusc --version`)
+  - OS and C compiler version
   - Minimal `.urus` file that reproduces the bug
   - Expected vs actual behavior
   - Error message (if any)
@@ -42,34 +47,33 @@ Thank you for your interest in contributing to URUS! This guide will help you ge
 
 ### Submitting Code
 
-1. **Create a branch** from `dev`:
+1. **Create a branch** from `main`:
    ```bash
-   git checkout dev
-   git pull origin dev
-   git checkout -b feature/your-feature-name
+   git checkout main
+   git pull origin main
+   git checkout -b feat/your-feature-name
    ```
 
 2. **Make your changes** following the [coding standards](#coding-standards)
 
-3. **Add tests:**
-   - `tests/valid/` — programs that should compile
-   - `tests/invalid/` — programs that should produce errors
-   - `tests/run/` — programs with expected output (`.urus` + `.expected`)
+3. **Add tests** in `tests/run/`:
+   - Create a `.urus` source file
+   - Create a matching `.expected` file with expected output
 
 4. **Run the test suite:**
    ```bash
    cd tests
-   bash run_tests.sh ../compiler/urusc
+   bash run_tests.sh ../compiler/build/urusc
    ```
 
 5. **Commit** with a clear message:
    ```bash
-   git commit -m "Add: short description of changes"
+   git commit -m "feat: short description of changes"
    ```
 
 6. **Push** and open a Pull Request:
    ```bash
-   git push -u origin feature/your-feature-name
+   git push -u origin feat/your-feature-name
    ```
 
 ## Coding Standards
@@ -84,18 +88,20 @@ Thank you for your interest in contributing to URUS! This guide will help you ge
 
 ### Commit Messages
 
+Use [Conventional Commits](https://www.conventionalcommits.org/) format:
+
 ```
 <type>: <short description>
 ```
 
 | Type | Usage |
 |------|-------|
-| `Add` | New feature |
-| `Fix` | Bug fix |
-| `Update` | Change to existing feature |
-| `Refactor` | Internal change, no behavior change |
-| `Docs` | Documentation only |
-| `Test` | New or updated tests |
+| `feat` | New feature |
+| `fix` | Bug fix |
+| `refactor` | Internal change, no behavior change |
+| `docs` | Documentation only |
+| `test` | New or updated tests |
+| `chore` | Build, CI, or tooling changes |
 
 ### Adding a New Language Feature
 
@@ -105,18 +111,16 @@ If you're adding a new language feature, follow this checklist:
 2. `compiler/src/lexer.c` — Recognize token
 3. `compiler/include/ast.h` + `compiler/src/ast.c` — Add AST node type
 4. `compiler/src/parser.c` — Parse new syntax
-5. `compiler/src/sema.c` — Type-check
+5. `compiler/src/Sema/sema.c` — Type-check
 6. `compiler/src/codegen.c` — Generate C code
-7. `compiler/include/urus_runtime.h` — Add runtime support (if needed)
-8. `tests/` — Add test cases
+7. `compiler/runtime/urus_runtime.h` — Add runtime support (if needed)
+8. `tests/run/` — Add test cases (`.urus` + `.expected`)
 9. `SPEC.md` — Update language spec
 10. `examples/` — Add example program
 
-See the [Development Guide](./documentation/development-guide/) for more details.
-
 ## Pull Request Guidelines
 
-- Target the `dev` branch (not `main`)
+- Target the `main` branch
 - Keep PRs focused — one feature or fix per PR
 - Include tests for new functionality
 - Update documentation if the change affects user-facing behavior
@@ -127,19 +131,19 @@ See the [Development Guide](./documentation/development-guide/) for more details
 
 ```
 compiler/
-  src/          # C source files
-  include/      # Header files + runtime
+  src/              # C source files
+  include/          # Header files
+  runtime/          # Embedded runtime (urus_runtime.h)
+  stdlib/           # Standard library modules (.urus)
 tests/
-  valid/        # Should compile without errors
-  invalid/      # Should produce compile errors
-  run/          # Compile, run, check output
-examples/       # Example URUS programs
-documentation/  # Full project docs
+  run/              # Compile, run, check output (.urus + .expected)
+examples/           # Example URUS programs
+documentation/      # Extended documentation
 ```
 
 ## Need Help?
 
-- Read the [Documentation](./documentation/)
+- Read the [Documentation](./documentation/index.md)
 - Check the [Language Spec](SPEC.md)
 - Look at [Examples](./examples/) for syntax reference
 - Open an issue if you're stuck

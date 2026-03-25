@@ -8,12 +8,10 @@
 </p>
 
 <p align="center">
-  <img src="https://img.shields.io/badge/version-V0.3.0-blue" alt="Version" />
-  <img src="https://img.shields.io/badge/build-passing-brightgreen" alt="Build" />
+  <img src="https://img.shields.io/badge/version-0.3.0-blue" alt="Version" />
   <img src="https://img.shields.io/badge/license-Apache%202.0-green" alt="License" />
-  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS-lightgrey" alt="Platform" />
+  <img src="https://img.shields.io/badge/platform-Windows%20%7C%20Linux%20%7C%20macOS%20%7C%20Termux-lightgrey" alt="Platform" />
   <img src="https://img.shields.io/badge/C-C11-orange" alt="C Standard" />
-  <img src="https://img.shields.io/badge/status-stable-brightgreen" alt="Status" />
 </p>
 
 <p align="center">
@@ -26,9 +24,11 @@
 
 ---
 
-## Language Status
+## What is URUS?
 
-URUS **V0.3.0** is in active development. Major update with tuples, runes (macros), type inference, tuple destructuring, if-expressions, HTTP built-ins, and memory safety improvements.
+URUS is a statically-typed programming language that compiles to standard C11. It aims to provide the safety guarantees of modern languages while producing code that runs anywhere a C compiler runs.
+
+The compiler is a single-pass transpiler written in C. It reads `.urus` source files, performs lexing, parsing, semantic analysis, and emits portable C11 code. The generated C is then compiled to a native binary using GCC, Clang, or any C11-compliant compiler.
 
 ---
 
@@ -37,10 +37,10 @@ URUS **V0.3.0** is in active development. Major update with tuples, runes (macro
 | Goal | How |
 |------|-----|
 | **Safer than C** | RAII memory management, bounds checking, immutable by default |
-| **Simpler than Rust** | No borrow checker, no lifetimes — just write code |
+| **Simpler than Rust** | No borrow checker, no lifetimes — straightforward ownership model |
 | **Faster than Python** | Compiles to native binary via C11 |
-| **More portable than Go** | Transpiles to standard C11 — runs anywhere GCC runs |
-| **Modern syntax** | Enums, pattern matching, string interpolation, Result type, tuples, macros |
+| **Portable** | Transpiles to standard C11 — runs anywhere GCC/Clang runs |
+| **Modern syntax** | Enums, pattern matching, string interpolation, Result types, tuples, macros |
 
 ---
 
@@ -48,46 +48,38 @@ URUS **V0.3.0** is in active development. Major update with tuples, runes (macro
 
 ### Requirements
 
-- **GCC** 8+ (MinGW-w64 / MSYS2 on Windows)
 - **CMake** 3.10+
+- **C compiler**: GCC 8+, Clang, or MSVC (for building the compiler)
+- **GCC** 8+ or compatible C11 compiler (for compiling generated code)
 
 ### Build from Source
 
-#### 1. Clone repo:
 ```bash
 git clone https://github.com/Urus-Foundation/Urus.git
 cd Urus/compiler
+cmake -S . -B build
+cmake --build build
 ```
 
-#### 2. Build (Linux/MacOS/Windows):
+On **Termux**:
 ```bash
-cmake -S . -B build/
-cmake --build build/
-```
-> if you're using **Termux**:
-```bash
-cmake -S . -B build/ -DCMAKE_INSTALL_PREFIX=$PREFIX
-cmake --build build/
+cmake -S . -B build -DCMAKE_INSTALL_PREFIX=$PREFIX
+cmake --build build
 ```
 
-#### 3. Install to system:
+### Install to System
 
 ```bash
 # Linux / macOS / Termux
 sudo cmake --install build
 
-# Windows (Run As Administrator)
+# Windows (Run as Administrator)
 cmake --install build
 ```
-> Having trouble installing? Report [Troubleshooting](https://github.com/Urus-Foundation/Urus/issues/new?template=complaint.md)
-
-### Prebuilt Binary
-
-> Coming soon — check [Releases](https://github.com/Urus-Foundation/Urus/releases) page.
 
 ### Hello World
 
-```rust
+```urus
 fn main(): void {
     print("Hello, World!");
 }
@@ -99,97 +91,120 @@ urusc hello.urus -o hello
 # Hello, World!
 ```
 
+> Having trouble? Open an issue on the [issue tracker](https://github.com/Urus-Foundation/Urus/issues/new?template=complaint.md).
+
 ---
 
 ## Features
 
-### Primitive Types
+### Type System
 
 | Type | Description | C Equivalent |
 |------|-------------|--------------|
 | `int` | 64-bit signed integer | `int64_t` |
 | `float` | 64-bit floating point | `double` |
 | `bool` | Boolean (`true` / `false`) | `bool` |
-| `str` | UTF-8 string (ref-counted) | `urus_str*` |
+| `str` | UTF-8 string (heap-allocated) | `urus_str*` |
 | `void` | No value | `void` |
 | `[T]` | Dynamic array of T | `urus_array*` |
 | `(T1, T2)` | Tuple (stack-allocated) | `struct { T1 f0; T2 f1; }` |
-| `Result<T, E>` | Ok or Err value | `urus_result` |
+| `Result<T, E>` | Ok or Err value | `urus_result*` |
 
 ### Variables
 
-```rust
+```urus
 let x: int = 10;           // immutable
 let mut count: int = 0;    // mutable
 count += 1;
 
-// Type inference (type annotation optional)
+// Type inference
 let name = "hello";        // inferred as str
 let pi = 3.14;             // inferred as float
 ```
 
+### Constants
+
+```urus
+const MAX_SIZE: int = 100;
+const PI: float = 3.14159;
+const APP_NAME: str = "MyApp";
+```
+
+### Type Aliases
+
+```urus
+type ID = int;
+type Name = str;
+type Numbers = [int];
+
+fn greet(id: ID, name: Name): void {
+    print(f"User {id}: {name}");
+}
+```
+
+### Functions
+
+```urus
+fn add(a: int, b: int): int {
+    return a + b;
+}
+
+// Default parameter values
+fn greet(name: str = "World"): void {
+    print(f"Hello {name}!");
+}
+
+// Mutable parameters
+fn increment(mut x: int): int {
+    x += 1;
+    return x;
+}
+```
+
 ### Tuples
 
-```rust
+```urus
 let t: (int, str) = (42, "hello");
 print(t.0);    // 42
 print(t.1);    // hello
 
-// Tuple destructuring
+// Destructuring
 let (x, y) = get_pair();
 
-// Destructuring in for-each
+// In for-each loops
 let pairs: [(int, str)] = [(1, "a"), (2, "b")];
 for (k, v) in pairs {
-    print(k);
-    print(v);
+    print(f"{k}: {v}");
 }
 ```
 
 ### Runes (Macros)
 
-```rust
-// Expression rune
+```urus
 rune square(x) { x * x }
-
-// If-expression rune
 rune max(a, b) { if a > b { a } else { b } }
-
-// Statement rune (multi-line)
-rune debug(msg, val) { print(msg); print(val); }
 
 fn main(): void {
     print(square!(5));       // 25
     print(max!(10, 20));     // 20
-    debug!("count", 42);     // prints: count \n 42
 }
 ```
 
 ### If-Expressions
 
-```rust
+```urus
 let label = if x > 5 { "big" } else { "small" };
 print(if x > 0 { "positive" } else { "negative" });
 ```
 
-### Functions
-
-```rust
-fn add(a: int, b: int): int {
-    return a + b;
-}
-
-fn greet(name: str = "Anonymous") {
-    print(f"Hello {name}!");
-}
-```
-
 ### Control Flow
 
-```rust
+```urus
 // If / Else
 if x > 10 {
     print("big");
+} else if x > 5 {
+    print("medium");
 } else {
     print("small");
 }
@@ -199,26 +214,31 @@ while x < 100 {
     x += 1;
 }
 
-// For (range)
-for i in 0..10 {       // exclusive: 0 to 9
-    print(f"{i}");
+// Do-While
+do {
+    x += 1;
+} while x < 100;
+
+// For (range, exclusive)
+for i in 0..10 {
+    print(i);
 }
 
-for i in 0..=10 {      // inclusive: 0 to 10
-    print(f"{i}");
+// For (range, inclusive)
+for i in 0..=10 {
+    print(i);
 }
 
-// For-each (array)
+// For-each
 let names: [str] = ["Alice", "Bob"];
 for name in names {
     print(name);
 }
 ```
-> The parentheses in the condition are optional. Example: `if (condition) { ... }`
 
 ### Structs
 
-```rust
+```urus
 struct Point {
     x: float;
     y: float;
@@ -231,9 +251,9 @@ fn distance(a: Point, b: Point): float {
 }
 ```
 
-### Enums & Pattern Matching
+### Enums and Pattern Matching
 
-```rust
+```urus
 enum Shape {
     Circle(r: float);
     Rect(w: float, h: float);
@@ -256,35 +276,76 @@ fn area(s: Shape): float {
 }
 ```
 
+Match also works with primitive types:
+
+```urus
+fn describe(n: int): void {
+    match n {
+        0 => { print("zero"); }
+        1 => { print("one"); }
+        _ => { print("other"); }
+    }
+}
+
+fn greet(lang: str): void {
+    match lang {
+        "en" => { print("Hello!"); }
+        "id" => { print("Halo!"); }
+        _ => { print("..."); }
+    }
+}
+```
+
+### Defer
+
+```urus
+fn process(): void {
+    print("start");
+    defer { print("cleanup"); }
+    print("working");
+    // "cleanup" runs automatically at end of function
+}
+```
+
+Defer bodies execute in LIFO order and run before every return path.
+
+### String Interpolation
+
+```urus
+let name: str = "World";
+let count: int = 42;
+print(f"Hello {name}! Answer: {count}");
+```
+
 ### Arrays
 
-```rust
+```urus
 let nums: [int] = [1, 2, 3, 4, 5];
 let first: int = nums[0];
 
 let mut items: [int] = [];
 push(items, 42);
 print(f"Length: {len(items)}");
+
+// Method-call syntax
+items.push(10);
+print(items.len());
 ```
 
-### String Interpolation
+### String Methods
 
-```rust
-let name: str = "World";
-let count: int = 42;
-print(f"Hello {name}! Answer: {count}");
+```urus
+let s: str = "  Hello World  ";
+print(s.trim());            // "Hello World"
+print(s.upper());           // "  HELLO WORLD  "
+print(s.lower());           // "  hello world  "
+print(s.contains("World")); // true
+print(s.len());             // 15
 ```
 
-### Default parameters value
-```rust
-fn greet(name: str = "John-fried") {
-    print(f"Hello there {name}");
-}
-```
+### Modules
 
-### Modules / Imports
-
-```rust
+```urus
 // math_utils.urus
 fn square(x: int): int {
     return x * x;
@@ -298,9 +359,9 @@ fn main(): void {
 }
 ```
 
-### Error Handling (Result Type)
+### Error Handling
 
-```rust
+```urus
 fn divide(a: int, b: int): Result<int, str> {
     if b == 0 {
         return Err("division by zero");
@@ -317,6 +378,20 @@ fn main(): void {
     }
 }
 ```
+
+### Operators
+
+| Category | Operators |
+|----------|-----------|
+| Arithmetic | `+`, `-`, `*`, `/`, `%` |
+| Exponent | `**` |
+| Comparison | `==`, `!=`, `<`, `>`, `<=`, `>=` |
+| Logical | `&&`, `\|\|`, `!` |
+| Bitwise | `&`, `\|`, `^`, `~`, `<<`, `>>`, `&~` |
+| Assignment | `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `\|=`, `^=`, `<<=`, `>>=` |
+| Increment/Decrement | `++`, `--` |
+| String concat | `+` |
+| Floored remainder | `%%` |
 
 ---
 
@@ -345,17 +420,17 @@ fn main(): void {
 | Function | Description |
 |----------|-------------|
 | `str_len(s)` | String length |
-| `str_upper(s)` | Uppercase |
-| `str_lower(s)` | Lowercase |
-| `str_trim(s)` | Trim whitespace |
-| `str_contains(s, sub)` | Check if contains substring |
-| `str_find(s, sub)` | Find index of substring |
-| `str_slice(s, a, b)` | Substring from a to b |
-| `str_replace(s, a, b)` | Replace occurrences |
-| `str_starts_with(s, p)` | Check prefix |
-| `str_ends_with(s, p)` | Check suffix |
-| `str_split(s, delim)` | Split into array |
-| `char_at(s, i)` | Character at index |
+| `str_upper(s)` / `s.upper()` | Uppercase |
+| `str_lower(s)` / `s.lower()` | Lowercase |
+| `str_trim(s)` / `s.trim()` | Trim whitespace |
+| `str_contains(s, sub)` / `s.contains(sub)` | Check substring |
+| `str_find(s, sub)` / `s.find(sub)` | Find index of substring |
+| `str_slice(s, a, b)` / `s.slice(a, b)` | Substring |
+| `str_replace(s, old, new)` / `s.replace(old, new)` | Replace occurrences |
+| `str_starts_with(s, p)` / `s.starts_with(p)` | Check prefix |
+| `str_ends_with(s, p)` / `s.ends_with(p)` | Check suffix |
+| `str_split(s, d)` / `s.split(d)` | Split into array |
+| `char_at(s, i)` / `s.char_at(i)` | Character at index |
 
 ### Conversion
 
@@ -379,10 +454,10 @@ fn main(): void {
 
 | Function | Description |
 |----------|-------------|
-| `is_ok(result)` | Check if Ok |
-| `is_err(result)` | Check if Err |
-| `unwrap(result)` | Extract Ok value (aborts on Err) |
-| `unwrap_err(result)` | Extract Err value (aborts on Ok) |
+| `is_ok(r)` | Check if Ok |
+| `is_err(r)` | Check if Err |
+| `unwrap(r)` | Extract Ok value (aborts on Err) |
+| `unwrap_err(r)` | Extract Err message (aborts on Ok) |
 
 ### HTTP
 
@@ -391,21 +466,23 @@ fn main(): void {
 | `http_get(url)` | HTTP GET request, returns response body |
 | `http_post(url, body)` | HTTP POST request, returns response body |
 
+> Requires `curl` to be available on the system.
+
 ### Misc
 
 | Function | Description |
 |----------|-------------|
 | `exit(code)` | Exit program |
-| `assert(cond, msg)` | Abort if false |
+| `assert(cond, msg)` | Abort if condition is false |
 
 ---
 
 ## CLI Usage
 
 ```
-URUS Compiler V0.3.0
+URUS Compiler, version 0.3.0
 
-usage: urusc <file.urus> [options]
+Usage: urusc <file.urus> [options]
 
 Options:
   --help      Show help message
@@ -413,7 +490,7 @@ Options:
   --tokens    Display lexer tokens
   --ast       Display the AST
   --emit-c    Print generated C code to stdout
-  -o <file>   Output executable name (default: a.exe)
+  -o <file>   Output executable name (default: a.exe / a.out)
 
 Example:
   urusc main.urus -o app
@@ -425,24 +502,65 @@ Example:
 
 ```
 Source (.urus)
-     |
-     v
-  [ Lexer ]       Tokenize source code
-     |
-     v
-  [ Parser ]      Build Abstract Syntax Tree
-     |
-     v
-  [ Sema ]        Type checking & semantic analysis
-     |
-     v
-  [ Codegen ]     Generate standard C11 code
-     |
-     v
-  [ GCC ]         Compile to native binary
-     |
-     v
-  Executable
+     |
+     v
+  [ Lexer ]       Tokenize source code
+     |
+     v
+  [ Preprocessor ] Expand imports and rune macros
+     |
+     v
+  [ Parser ]      Build Abstract Syntax Tree
+     |
+     v
+  [ Sema ]        Type checking and semantic analysis
+     |
+     v
+  [ Codegen ]     Generate standard C11 code
+     |
+     v
+  [ GCC/Clang ]   Compile to native binary
+     |
+     v
+  Executable
+```
+
+---
+
+## Project Structure
+
+```
+Urus/
+├── compiler/
+│   ├── src/                   # Compiler implementation
+│   │   ├── main.c             # CLI entry point
+│   │   ├── lexer.c            # Tokenizer
+│   │   ├── parser.c           # Recursive descent parser
+│   │   ├── codegen.c          # C11 code generator
+│   │   ├── ast.c              # AST constructors and utilities
+│   │   ├── preprocess.c       # Import resolution and rune expansion
+│   │   ├── error.c            # Error/warning reporting
+│   │   ├── util.c             # File and string utilities
+│   │   └── Sema/              # Semantic analysis
+│   │       ├── sema.c         # Type checking and validation
+│   │       ├── builtins.c     # Built-in function signatures
+│   │       └── scope.c        # Scope and symbol table
+│   ├── include/               # Public headers
+│   ├── runtime/               # Embedded runtime library
+│   │   └── urus_runtime.h     # Header-only runtime (strings, arrays, etc.)
+│   ├── stdlib/                # Standard library modules (.urus)
+│   └── CMakeLists.txt         # Build configuration
+├── examples/                  # Sample programs
+├── tests/                     # Test suite
+│   └── run/                   # Integration tests (.urus + .expected)
+├── documentation/             # Extended documentation
+├── SPEC.md                    # Language specification
+├── CONTRIBUTING.md            # Contribution guide
+├── SECURITY.md                # Security policy
+├── CODE_OF_CONDUCT.md         # Community guidelines
+├── CHANGELOG.md               # Version history
+├── Dockerfile                 # Containerized build
+└── LICENSE                    # Apache 2.0
 ```
 
 ---
@@ -451,15 +569,14 @@ Source (.urus)
 
 | Metric | Value |
 |--------|-------|
-| Version | V0.3.0 |
-| Compiler Size | ~500 KB (standalone, runtime embedded) |
-| Runtime | ~18 KB header-only (embedded in binary) |
-| Compiler LOC | ~5,500+ |
-| Runtime LOC | ~595 |
+| Version | 0.3.0 |
+| Compiler LOC | ~7,100+ |
+| Runtime LOC | ~540 |
+| Test files | 33 |
 | Output | C11 compliant |
-| Platforms | Windows, Linux, macOS |
-| Build System | CMake 3.10+ |
-| Dependencies | GCC 8+ only |
+| Platforms | Windows, Linux, macOS, Termux |
+| Build system | CMake 3.10+ |
+| Dependencies | C11 compiler only |
 
 ---
 
@@ -472,46 +589,10 @@ cd tests/
 bash run_tests.sh ../compiler/build/urusc
 
 # Windows
-run_tests.bat ..\compiler\build\Release\urusc.exe
+run_tests.bat ..\compiler\build\Debug\urusc.exe
 ```
 
----
-
-## Repository Structure
-
-```yaml
-Urus/
-├── compiler/                  # Compiler source code
-│   ├── src/                   # Implementation (.c)
-│   │   ├── main.c             # CLI entry point
-│   │   ├── lexer.c            # Tokenizer
-│   │   ├── parser.c           # Recursive descent parser
-│   │   ├── sema.c             # Semantic analysis
-│   │   ├── codegen.c          # C11 code generator
-│   │   ├── ast.c              # AST node constructors
-│   │   ├── error.c            # Error reporting
-│   │   └── util.c             # File/string utilities
-│   ├── include/               # Headers (.h)
-│   │   ├── ast.h              # AST definitions
-│   │   ├── token.h            # Token types
-│   │   ├── lexer.h            # Lexer interface
-│   │   ├── parser.h           # Parser interface
-│   │   ├── sema.h             # Sema interface
-│   │   ├── codegen.h          # Codegen interface
-│   │   ├── error.h            # Error interface
-│   │   ├── util.h             # Utility functions
-│   │   └── urus_runtime.h     # Embedded runtime library
-│   ├── cmake/                 # Build automation scripts
-│   └── CMakeLists.txt         # Main build configuration
-├── examples/                  # Sample programs (.urus)
-├── tests/                     # Test suite & runners
-├── documentation/             # Detailed project docs
-├── SPEC.md                    # Language spec & grammar
-├── CHANGELOG.md               # Version history
-├── Diary/                     # Dev notes & complaints
-├── Dockerfile                 # Containerized build
-└── LICENSE                    # Apache 2.0
-```
+Each test consists of a `.urus` source file and a `.expected` file. The test runner compiles and runs the program, then compares the output against the expected file.
 
 ---
 
@@ -527,45 +608,53 @@ Urus/
 | Null safety | Yes | No | Yes | No | No |
 | Compiles to native | Yes | Yes | Yes | Yes | No |
 | Learning curve | Low | Medium | High | Low | Low |
-| Zero dependencies | Yes | Yes | No | No | No |
 
 ---
 
 ## Roadmap
 
-### V0.3.0 — Tuples, Macros & Inference (current)
-- ~~Tuple types `(int, str)` with field access `.0`, `.1`~~
-- ~~Tuple destructuring `let (x, y) = expr;`~~
-- ~~Runes — unique macro system with `rune` / `name!()` syntax~~
-- ~~Statement-level runes (multi-line macros)~~
-- ~~If-expressions (ternary) `if cond { a } else { b }`~~
-- ~~Type inference `let x = 42;`~~
-- ~~HTTP built-ins `http_get()`, `http_post()`~~
-- ~~String escape sequences `\t`, `\0`~~
-- ~~Memory safety fixes (urus_alloc, urus_pop, read_file)~~
+### 0.3.x (current)
 
-### V0.4.0 — Type System
-- Type aliases (`type ID = int;`)
+- [x] Tuple types and destructuring
+- [x] Runes (macro system)
+- [x] If-expressions
+- [x] Type inference
+- [x] HTTP built-ins
+- [x] Constants (`const`)
+- [x] Type aliases (`type`)
+- [x] String and array method-call syntax
+- [x] Do-while loops
+- [x] Defer statements
+- [x] Extended pattern matching (int, str, bool)
+- [x] Bitwise and exponent operators
+- [x] Mutable function parameters
+- [x] Raw emit blocks
+
+### 0.4.0 — Type System
+
 - Optional type (`Option<T>`)
 - Generics (`fn max<T>(a: T, b: T): T`)
-- Portable RAII (explicit drop insertion, no `__attribute__` needed)
+- Portable RAII (explicit drop insertion)
 
-### V0.5.0 — Methods & Traits
+### 0.5.0 — Methods and Traits
+
 - Methods (`impl Point { fn distance() }`)
 - Traits / Interfaces
 - Closures
 - Bundled TCC as default C backend
 
-### V1.0.0 — Stable Release
+### 1.0.0 — Stable Release
+
 - Standard library
 - Package manager
 - Full documentation
 - Production-ready
 
-### V2.0.0 — Advanced
+### 2.0.0 — Advanced
+
 - Async/await
-- Concurrency
-- WASM target
+- Concurrency primitives
+- WebAssembly target
 - Self-hosting compiler
 - LSP server for IDE support
 
@@ -584,30 +673,26 @@ URUS draws inspiration from:
 
 ## Contributing
 
-```
-1. Fork the repo
-2. Create a feature branch
-3. Follow coding style (see documentation/development-guide)
-4. Add tests
-5. Update documentation
-6. Submit PR
-```
+We welcome contributions of all kinds. See [CONTRIBUTING.md](./CONTRIBUTING.md) for the full guide.
 
-See [CONTRIBUTING.md](./CONTRIBUTING.md) for details.
+```
+1. Fork the repository
+2. Create a feature branch
+3. Make your changes and add tests
+4. Submit a pull request
+```
 
 ---
 
 ## License
 
-Apache License 2.0 — see [LICENSE](./LICENSE)
+Licensed under the Apache License, Version 2.0. See [LICENSE](./LICENSE) for the full text.
 
 ---
 
 ## Contributors
 
-Thanks to everyone who has contributed to URUS!
-
-### Urus Foundation Developer
+### Urus Foundation
 
 <table>
   <tr>
@@ -617,7 +702,7 @@ Thanks to everyone who has contributed to URUS!
   </tr>
 </table>
 
-### Urus Foundation Contributors
+### Contributors
 
 <table>
   <tr>
@@ -634,8 +719,6 @@ Thanks to everyone who has contributed to URUS!
 ---
 
 <p align="center">
-  <strong>Built with care. Designed for clarity.</strong>
-  <br><br>
   <a href="./documentation/">Documentation</a> &nbsp;&bull;&nbsp;
   <a href="./examples/">Examples</a> &nbsp;&bull;&nbsp;
   <a href="./SPEC.md">Specification</a> &nbsp;&bull;&nbsp;
