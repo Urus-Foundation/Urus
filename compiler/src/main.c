@@ -177,19 +177,13 @@ int main(int argc, char **argv) {
 
     if (parser.had_error) {
         fprintf(stderr, "Parsing failed.\n");
-        ast_free(program);
-        free(tokens);
-        free(source);
-        return 1;
+        goto cleanup_err;
     }
 
     // Process imports
     if (!preprocess_imports(program, path)) {
         fprintf(stderr, "Import resolution failed.\n");
-        ast_free(program);
-        free(tokens);
-        free(source);
-        return 1;
+        goto cleanup_err;
     }
 
     if (show_ast) {
@@ -200,10 +194,7 @@ int main(int argc, char **argv) {
     // Semantic analysis
     if (!sema_analyze(program, path)) {
         fprintf(stderr, "Semantic analysis failed.\n");
-        ast_free(program);
-        free(tokens);
-        free(source);
-        return 1;
+        goto cleanup_err;
     }
 
     // Code generation
@@ -226,10 +217,7 @@ int main(int argc, char **argv) {
         if (!f) {
             fprintf(stderr, "Error: cannot create temp file '%s'\n", c_path);
             codegen_free(&cbuf);
-            ast_free(program);
-            free(tokens);
-            free(source);
-            return 1;
+            goto cleanup_err;
         }
         fwrite(cbuf.data, 1, cbuf.len, f);
         fclose(f);
@@ -288,10 +276,7 @@ int main(int argc, char **argv) {
         if (ret != 0) {
             fprintf(stderr, "Compilation failed.\n");
             codegen_free(&cbuf);
-            ast_free(program);
-            free(tokens);
-            free(source);
-            return 1;
+            goto cleanup_err;
         }
 
         if (run_after) {
@@ -321,4 +306,10 @@ int main(int argc, char **argv) {
     free(tokens);
     free(source);
     return 0;
+
+cleanup_err:
+    ast_free(program);
+    free(tokens);
+    free(source);
+    return 1;
 }
