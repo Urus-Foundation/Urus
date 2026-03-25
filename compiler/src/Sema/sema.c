@@ -798,59 +798,86 @@ static void check_stmt(SemaCtx *ctx, AstNode *node) {
 
     case NODE_MATCH: {
         AstType *target_type = check_expr(ctx, node->as.match_stmt.target);
-        if (!target_type || target_type->kind != TYPE_NAMED) {
-            sema_error(ctx, &node->as.match_stmt.target->tok, "match target must be an enum type, got '%s'",
-                       ast_type_str(target_type));
-            break;
-        }
-        SemaSymbol *enum_sym = scope_lookup(ctx->current, target_type->name);
-        if (!enum_sym || !enum_sym->is_enum) {
-            sema_error(ctx, &node->as.match_stmt.target->tok, "match target type '%s' is not an enum", target_type->name);
-            break;
-        }
+        if (!target_type) break;
 
-        for (int i = 0; i < node->as.match_stmt.arm_count; i++) {
-            MatchArm *arm = &node->as.match_stmt.arms[i];
-            // Find variant
-            EnumVariant *variant = NULL;
-            for (int v = 0; v < enum_sym->variant_count; v++) {
-                if (strcmp(enum_sym->variants[v].name, arm->variant_name) == 0) {
-                    variant = &enum_sym->variants[v];
-                    break;
+        // Determine if this is a primitive match (int/str/bool) or enum match
+        bool is_primitive = (target_type->kind == TYPE_INT || target_type->kind == TYPE_STR ||
+                             target_type->kind == TYPE_BOOL);
+
+        if (is_primitive) {
+            // Primitive match: arms are literals or _
+            for (int i = 0; i < node->as.match_stmt.arm_count; i++) {
+                MatchArm *arm = &node->as.match_stmt.arms[i];
+                if (!arm->is_wildcard && arm->pattern_expr) {
+                    AstType *pat_type = check_expr(ctx, arm->pattern_expr);
+                    if (pat_type && !ast_types_equal(pat_type, target_type)) {
+                        sema_error(ctx, &arm->pattern_expr->tok,
+                                   "match arm pattern type '%s' does not match target type '%s'",
+                                   ast_type_str(pat_type), ast_type_str(target_type));
+                    }
+                }
+                // Check arm body
+                AstNode *arm_body = arm->body;
+                for (int s = 0; s < arm_body->as.block.stmt_count; s++) {
+                    check_stmt(ctx, arm_body->as.block.stmts[s]);
                 }
             }
-            if (!variant) {
-                sema_error(ctx, &node->as.match_stmt.target->tok, "enum '%s' has no variant '%s'",
-                           target_type->name, arm->variant_name);
-                continue;
-            }
-            if (arm->binding_count != variant->field_count) {
-                sema_error(ctx, &node->as.match_stmt.target->tok, "variant '%s' has %d fields, got %d bindings",
-                           arm->variant_name, variant->field_count, arm->binding_count);
+        } else if (target_type->kind == TYPE_NAMED) {
+            // Enum match
+            SemaSymbol *enum_sym = scope_lookup(ctx->current, target_type->name);
+            if (!enum_sym || !enum_sym->is_enum) {
+                sema_error(ctx, &node->as.match_stmt.target->tok,
+                           "match target type '%s' is not an enum", target_type->name);
+                break;
             }
 
-            // Store binding types for codegen
-            if (arm->binding_count > 0) {
-                arm->binding_types = malloc(sizeof(AstType *) * (size_t)arm->binding_count);
+            for (int i = 0; i < node->as.match_stmt.arm_count; i++) {
+                MatchArm *arm = &node->as.match_stmt.arms[i];
+                // Find variant
+                EnumVariant *variant = NULL;
+                for (int v = 0; v < enum_sym->variant_count; v++) {
+                    if (strcmp(enum_sym->variants[v].name, arm->variant_name) == 0) {
+                        variant = &enum_sym->variants[v];
+                        break;
+                    }
+                }
+                if (!variant) {
+                    sema_error(ctx, &node->as.match_stmt.target->tok, "enum '%s' has no variant '%s'",
+                               target_type->name, arm->variant_name);
+                    continue;
+                }
+                if (arm->binding_count != variant->field_count) {
+                    sema_error(ctx, &node->as.match_stmt.target->tok, "variant '%s' has %d fields, got %d bindings",
+                               arm->variant_name, variant->field_count, arm->binding_count);
+                }
+
+                // Store binding types for codegen
+                if (arm->binding_count > 0) {
+                    arm->binding_types = malloc(sizeof(AstType *) * (size_t)arm->binding_count);
+                    for (int b = 0; b < arm->binding_count && b < variant->field_count; b++) {
+                        arm->binding_types[b] = ast_type_clone(variant->fields[b].type);
+                    }
+                }
+
+                // Check arm body with bindings in scope
+                SemaScope *arm_scope = scope_new(ctx->current);
+                ctx->current = arm_scope;
                 for (int b = 0; b < arm->binding_count && b < variant->field_count; b++) {
-                    arm->binding_types[b] = ast_type_clone(variant->fields[b].type);
+                    SemaSymbol *binding = scope_add(arm_scope, arm->bindings[b], node->tok);
+                    binding->type = ast_type_clone(variant->fields[b].type);
+                    binding->is_mut = false;
                 }
+                AstNode *arm_body = arm->body;
+                for (int s = 0; s < arm_body->as.block.stmt_count; s++) {
+                    check_stmt(ctx, arm_body->as.block.stmts[s]);
+                }
+                ctx->current = arm_scope->parent;
+                scope_free(arm_scope);
             }
-
-            // Check arm body with bindings in scope
-            SemaScope *arm_scope = scope_new(ctx->current);
-            ctx->current = arm_scope;
-            for (int b = 0; b < arm->binding_count && b < variant->field_count; b++) {
-                SemaSymbol *binding = scope_add(arm_scope, arm->bindings[b], node->tok);
-                binding->type = ast_type_clone(variant->fields[b].type);
-                binding->is_mut = false;
-            }
-            AstNode *arm_body = arm->body;
-            for (int s = 0; s < arm_body->as.block.stmt_count; s++) {
-                check_stmt(ctx, arm_body->as.block.stmts[s]);
-            }
-            ctx->current = arm_scope->parent;
-            scope_free(arm_scope);
+        } else {
+            sema_error(ctx, &node->as.match_stmt.target->tok,
+                       "match target must be an enum, int, str, or bool type, got '%s'",
+                       ast_type_str(target_type));
         }
         break;
     }

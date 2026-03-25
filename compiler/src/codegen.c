@@ -1121,44 +1121,87 @@ static void gen_stmt(CodeBuf *buf, AstNode *node) {
         break;
     case NODE_MATCH: {
         gen_expr_pre(buf, node->as.match_stmt.target);
-        // Store target in temp
         int tmp = buf->tmp_counter++;
-        emit_indent(buf);
-        // Determine enum type name from first arm
-        const char *ename = "";
-        if (node->as.match_stmt.arm_count > 0) {
-            ename = node->as.match_stmt.arms[0].enum_name;
-        }
-        emit(buf, "%s* _urus_match_%d = ", ename, tmp);
-        gen_expr(buf, node->as.match_stmt.target);
-        emit(buf, ";\n");
+        AstType *target_type = node->as.match_stmt.target->resolved_type;
+        bool is_primitive = target_type && (target_type->kind == TYPE_INT ||
+                            target_type->kind == TYPE_STR || target_type->kind == TYPE_BOOL);
 
-        for (int i = 0; i < node->as.match_stmt.arm_count; i++) {
-            MatchArm *arm = &node->as.match_stmt.arms[i];
+        if (is_primitive) {
+            // Primitive match: store target in temp variable
             emit_indent(buf);
-            if (i == 0) emit(buf, "if ");
-            else emit(buf, "else if ");
-            emit(buf, "(_urus_match_%d->tag == %s_TAG_%s) ", tmp, arm->enum_name, arm->variant_name);
-            emit(buf, "{\n");
-            buf->indent++;
-            // Bind variant fields
-            for (int b = 0; b < arm->binding_count; b++) {
+            gen_type(buf, target_type);
+            emit(buf, " _urus_match_%d = ", tmp);
+            gen_expr(buf, node->as.match_stmt.target);
+            emit(buf, ";\n");
+
+            bool first = true;
+            for (int i = 0; i < node->as.match_stmt.arm_count; i++) {
+                MatchArm *arm = &node->as.match_stmt.arms[i];
                 emit_indent(buf);
-                if (arm->binding_types && arm->binding_types[b]) {
-                    gen_type(buf, arm->binding_types[b]);
+                if (arm->is_wildcard) {
+                    if (!first) emit(buf, "else ");
+                    emit(buf, "{\n");
                 } else {
-                    emit(buf, "int64_t");
+                    if (first) emit(buf, "if (");
+                    else emit(buf, "else if (");
+
+                    if (target_type->kind == TYPE_STR) {
+                        emit(buf, "urus_str_equal(_urus_match_%d, ", tmp);
+                        gen_expr(buf, arm->pattern_expr);
+                        emit(buf, ")");
+                    } else {
+                        emit(buf, "_urus_match_%d == ", tmp);
+                        gen_expr(buf, arm->pattern_expr);
+                    }
+                    emit(buf, ") {\n");
+                    first = false;
                 }
-                emit(buf, " %s = _urus_match_%d->data.%s.f%d;\n",
-                     arm->bindings[b], tmp, arm->variant_name, b);
+                buf->indent++;
+                for (int s = 0; s < arm->body->as.block.stmt_count; s++) {
+                    gen_stmt(buf, arm->body->as.block.stmts[s]);
+                }
+                buf->indent--;
+                emit_indent(buf);
+                emit(buf, "}\n");
             }
-            // Emit body statements
-            for (int s = 0; s < arm->body->as.block.stmt_count; s++) {
-                gen_stmt(buf, arm->body->as.block.stmts[s]);
-            }
-            buf->indent--;
+        } else {
+            // Enum match
             emit_indent(buf);
-            emit(buf, "}\n");
+            const char *ename = "";
+            if (node->as.match_stmt.arm_count > 0 && node->as.match_stmt.arms[0].enum_name) {
+                ename = node->as.match_stmt.arms[0].enum_name;
+            }
+            emit(buf, "%s* _urus_match_%d = ", ename, tmp);
+            gen_expr(buf, node->as.match_stmt.target);
+            emit(buf, ";\n");
+
+            for (int i = 0; i < node->as.match_stmt.arm_count; i++) {
+                MatchArm *arm = &node->as.match_stmt.arms[i];
+                emit_indent(buf);
+                if (i == 0) emit(buf, "if ");
+                else emit(buf, "else if ");
+                emit(buf, "(_urus_match_%d->tag == %s_TAG_%s) ", tmp, arm->enum_name, arm->variant_name);
+                emit(buf, "{\n");
+                buf->indent++;
+                // Bind variant fields
+                for (int b = 0; b < arm->binding_count; b++) {
+                    emit_indent(buf);
+                    if (arm->binding_types && arm->binding_types[b]) {
+                        gen_type(buf, arm->binding_types[b]);
+                    } else {
+                        emit(buf, "int64_t");
+                    }
+                    emit(buf, " %s = _urus_match_%d->data.%s.f%d;\n",
+                         arm->bindings[b], tmp, arm->variant_name, b);
+                }
+                // Emit body statements
+                for (int s = 0; s < arm->body->as.block.stmt_count; s++) {
+                    gen_stmt(buf, arm->body->as.block.stmts[s]);
+                }
+                buf->indent--;
+                emit_indent(buf);
+                emit(buf, "}\n");
+            }
         }
         break;
     }

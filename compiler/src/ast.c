@@ -397,16 +397,23 @@ void ast_print(AstNode *node, int ind) {
         ast_print(node->as.match_stmt.target, ind + 2);
         for (int i = 0; i < node->as.match_stmt.arm_count; i++) {
             MatchArm *a = &node->as.match_stmt.arms[i];
-            indent(ind + 1); printf("arm %s.%s", a->enum_name, a->variant_name);
-            if (a->binding_count > 0) {
-                printf("(");
-                for (int j = 0; j < a->binding_count; j++) {
-                    if (j > 0) printf(", ");
-                    printf("%s", a->bindings[j]);
+            indent(ind + 1);
+            if (a->is_wildcard) {
+                printf("arm _ =>\n");
+            } else if (a->pattern_expr) {
+                printf("arm <literal> =>\n");
+            } else {
+                printf("arm %s.%s", a->enum_name, a->variant_name);
+                if (a->binding_count > 0) {
+                    printf("(");
+                    for (int j = 0; j < a->binding_count; j++) {
+                        if (j > 0) printf(", ");
+                        printf("%s", a->bindings[j]);
+                    }
+                    printf(")");
                 }
-                printf(")");
+                printf(" =>\n");
             }
-            printf(" =>\n");
             ast_print(a->body, ind + 2);
         }
         break;

@@ -1,0 +1,39 @@
+fn describe(n: int): void {
+    match n {
+        0 => { print("zero"); }
+        1 => { print("one"); }
+        2 => { print("two"); }
+        _ => { print("other"); }
+    }
+}
+
+fn greet(lang: str): void {
+    match lang {
+        "en" => { print("Hello!"); }
+        "id" => { print("Halo!"); }
+        "jp" => { print("Konnichiwa!"); }
+        _ => { print("..."); }
+    }
+}
+
+fn check(b: bool): void {
+    match b {
+        true => { print("yes"); }
+        false => { print("no"); }
+    }
+}
+
+fn main(): void {
+    describe(0);
+    describe(1);
+    describe(2);
+    describe(99);
+
+    greet("en");
+    greet("id");
+    greet("jp");
+    greet("fr");
+
+    check(true);
+    check(false);
+}

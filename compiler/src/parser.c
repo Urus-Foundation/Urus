@@ -30,6 +30,11 @@ static bool check(Parser *p, TokenType type) {
     return current(p).type == type;
 }
 
+static TokenType peek_next_type(Parser *p) {
+    if (p->tokens[p->pos].type == TOK_EOF) return TOK_EOF;
+    return p->tokens[p->pos + 1].type;
+}
+
 static bool at_end(Parser *p) {
     return current(p).type == TOK_EOF;
 }
@@ -1015,31 +1020,54 @@ static AstNode *parse_match(Parser *p) {
             cap *= 2;
             arms = realloc(arms, sizeof(MatchArm) * (size_t)cap);
         }
-        Token enum_tok = expect(p, TOK_IDENT, "expected enum name in match arm");
-        expect(p, TOK_DOT, "expected '.' after enum name");
-        Token var_tok = expect(p, TOK_IDENT, "expected variant name");
 
-        arms[count].enum_name = tok_str(enum_tok);
-        arms[count].variant_name = tok_str(var_tok);
+        // Initialize arm defaults
+        arms[count].enum_name = NULL;
+        arms[count].variant_name = NULL;
         arms[count].bindings = NULL;
         arms[count].binding_count = 0;
+        arms[count].binding_types = NULL;
+        arms[count].is_wildcard = false;
+        arms[count].pattern_expr = NULL;
 
-        if (match(p, TOK_LPAREN)) {
-            int bcap = 4, bcount = 0;
-            char **bindings = malloc(sizeof(char *) * (size_t)bcap);
-            if (!check(p, TOK_RPAREN)) {
-                do {
-                    if (bcount >= bcap) {
-                        bcap *= 2;
-                        bindings = realloc(bindings, sizeof(char *) * (size_t)bcap);
-                    }
-                    Token b = expect(p, TOK_IDENT, "expected binding name");
-                    bindings[bcount++] = tok_str(b);
-                } while (match(p, TOK_COMMA));
+        // Check what kind of pattern this is
+        if (check(p, TOK_INT_LIT) || check(p, TOK_STR_LIT) || check(p, TOK_TRUE) || check(p, TOK_FALSE)) {
+            // Literal pattern: 42, "hello", true, false
+            arms[count].pattern_expr = parse_primary(p);
+        } else if (check(p, TOK_MINUS) && peek_next_type(p) == TOK_INT_LIT) {
+            // Negative integer literal: -1
+            arms[count].pattern_expr = parse_unary(p);
+        } else if (check(p, TOK_IDENT) && current(p).length == 1 && current(p).start[0] == '_' &&
+                   peek_next_type(p) == TOK_ARROW) {
+            // Wildcard: _
+            advance_tok(p); // consume '_'
+            arms[count].is_wildcard = true;
+        } else {
+            // Enum pattern: EnumName.Variant or EnumName.Variant(bindings)
+            Token enum_tok = expect(p, TOK_IDENT, "expected pattern in match arm");
+            expect(p, TOK_DOT, "expected '.' after enum name");
+            Token var_tok = expect(p, TOK_IDENT, "expected variant name");
+
+            arms[count].enum_name = tok_str(enum_tok);
+            arms[count].variant_name = tok_str(var_tok);
+
+            if (match(p, TOK_LPAREN)) {
+                int bcap = 4, bcount = 0;
+                char **bindings = malloc(sizeof(char *) * (size_t)bcap);
+                if (!check(p, TOK_RPAREN)) {
+                    do {
+                        if (bcount >= bcap) {
+                            bcap *= 2;
+                            bindings = realloc(bindings, sizeof(char *) * (size_t)bcap);
+                        }
+                        Token b = expect(p, TOK_IDENT, "expected binding name");
+                        bindings[bcount++] = tok_str(b);
+                    } while (match(p, TOK_COMMA));
+                }
+                expect(p, TOK_RPAREN, "expected ')' after bindings");
+                arms[count].bindings = bindings;
+                arms[count].binding_count = bcount;
             }
-            expect(p, TOK_RPAREN, "expected ')' after bindings");
-            arms[count].bindings = bindings;
-            arms[count].binding_count = bcount;
         }
 
         expect(p, TOK_ARROW, "expected '=>' after match pattern");
