@@ -1,4 +1,5 @@
 #include "scope.h"
+#include "util.h"
 #include <stdlib.h>
 #include <string.h>
 
@@ -6,13 +7,13 @@ SemaScope *scope_new(SemaScope *parent) {
     SemaScope *s = calloc(1, sizeof(SemaScope));
     s->parent = parent;
     s->cap = 8;
-    s->syms = malloc(sizeof(SemaSymbol) * (size_t)s->cap);
+    s->syms = xmalloc(sizeof(SemaSymbol) * (size_t)s->cap);
     return s;
 }
 
 void scope_free(SemaScope *s) {
-    free(s->syms);
-    free(s);
+    xfree(s->syms);
+    xfree(s);
 }
 
 SemaSymbol *scope_lookup_local(SemaScope *s, const char *name) {
@@ -33,7 +34,7 @@ SemaSymbol *scope_lookup(SemaScope *s, const char *name) {
 SemaSymbol *scope_add(SemaScope *s, const char *name, Token tok) {
     if (s->count >= s->cap) {
         s->cap *= 2;
-        s->syms = realloc(s->syms, sizeof(SemaSymbol) * (size_t)s->cap);
+        s->syms = xrealloc(s->syms, sizeof(SemaSymbol) * (size_t)s->cap);
     }
     SemaSymbol *sym = &s->syms[s->count++];
     memset(sym, 0, sizeof(SemaSymbol));

@@ -1,5 +1,6 @@
 #include "config.h"
 #include "codegen.h"
+#include "util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -232,20 +233,20 @@ static void collect_and_emit_tuple_typedefs(CodeBuf *buf, AstNode *node) {
 void codegen_init(CodeBuf *buf) {
     buf->cap = 8192;
     buf->len = 0;
-    buf->data = malloc(buf->cap);
+    buf->data = xmalloc(buf->cap);
     buf->data[0] = '\0';
     buf->indent = 0;
     buf->tmp_counter = 0;
 }
 
 void codegen_free(CodeBuf *buf) {
-    free(buf->data);
+    xfree(buf->data);
 }
 
 static void buf_ensure(CodeBuf *buf, size_t extra) {
     while (buf->len + extra + 1 >= buf->cap) {
         buf->cap *= 2;
-        buf->data = realloc(buf->data, buf->cap);
+        buf->data = xrealloc(buf->data, buf->cap);
     }
 }
 

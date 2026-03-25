@@ -3,6 +3,7 @@
 #endif
 
 #include "sema.h"
+#include "util.h"
 #include "./scope.h"
 #include "error.h"
 #include <stdio.h>
@@ -236,11 +237,11 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node) {
                     node->as.call.callee->as.ident.name = strdup(fn_name_buf);
 
                     int new_count = node->as.call.arg_count + 1;
-                    AstNode **new_args = malloc(sizeof(AstNode *) * (size_t)new_count);
+                    AstNode **new_args = xmalloc(sizeof(AstNode *) * (size_t)new_count);
                     new_args[0] = obj;
                     for (int i = 0; i < node->as.call.arg_count; i++)
                         new_args[i + 1] = node->as.call.args[i];
-                    free(node->as.call.args);
+                    xfree(node->as.call.args);
                     node->as.call.args = new_args;
                     node->as.call.arg_count = new_count;
                     // Fall through to normal call checking below
@@ -314,7 +315,7 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node) {
 
 		// Inject default parameter types to args
 		if (node->as.call.arg_count < sym->param_count) {
-            AstNode **new_args = malloc(sizeof(AstNode *) * (size_t)sym->param_count);
+            AstNode **new_args = xmalloc(sizeof(AstNode *) * (size_t)sym->param_count);
 
             for (int i = 0; i < node->as.call.arg_count; i++) {
                 new_args[i] = node->as.call.args[i];
@@ -327,7 +328,7 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node) {
                 }
             }
 
-            free(node->as.call.args);
+            xfree(node->as.call.args);
             node->as.call.args = new_args;
             node->as.call.arg_count = sym->param_count;
 		}
@@ -534,7 +535,7 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node) {
 
     case NODE_TUPLE_LIT: {
         int count = node->as.tuple_lit.count;
-        AstType **elem_types = malloc(sizeof(AstType *) * (size_t)count);
+        AstType **elem_types = xmalloc(sizeof(AstType *) * (size_t)count);
         for (int i = 0; i < count; i++) {
             AstType *t = check_expr(ctx, node->as.tuple_lit.elements[i]);
             elem_types[i] = t ? ast_type_clone(t) : ast_type_simple(TYPE_VOID);
@@ -853,7 +854,7 @@ static void check_stmt(SemaCtx *ctx, AstNode *node) {
 
                 // Store binding types for codegen
                 if (arm->binding_count > 0) {
-                    arm->binding_types = malloc(sizeof(AstType *) * (size_t)arm->binding_count);
+                    arm->binding_types = xmalloc(sizeof(AstType *) * (size_t)arm->binding_count);
                     for (int b = 0; b < arm->binding_count && b < variant->field_count; b++) {
                         arm->binding_types[b] = ast_type_clone(variant->fields[b].type);
                     }

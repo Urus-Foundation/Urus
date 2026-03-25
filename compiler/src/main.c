@@ -21,6 +21,7 @@
 #endif
 
 #include "config.h"
+#include "common.h"
 #include "util.h"
 #include "lexer.h"
 #include "parser.h"
@@ -162,7 +163,7 @@ int main(int argc, char **argv) {
     int token_count;
     Token *tokens = lexer_tokenize(&lexer, &token_count);
     if (!tokens) {
-        free(source);
+        xfree(source);
         return 1;
     }
 
@@ -299,8 +300,8 @@ int main(int argc, char **argv) {
             // Execute the compiled binary
             codegen_free(&cbuf);
             ast_free(program);
-            free(tokens);
-            free(source);
+            xfree(tokens);
+            xfree(source);
 
 #ifdef _WIN32
             int run_ret = (int)_spawnl(_P_WAIT, out_path, out_path, NULL);
@@ -319,13 +320,13 @@ int main(int argc, char **argv) {
 
     codegen_free(&cbuf);
     ast_free(program);
-    free(tokens);
-    free(source);
+    xfree(tokens);
+    xfree(source);
     return 0;
 
 cleanup_err:
     ast_free(program);
-    free(tokens);
-    free(source);
+    xfree(tokens);
+    xfree(source);
     return 1;
 }
