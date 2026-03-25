@@ -1,4 +1,5 @@
 #include "lexer.h"
+#include "util.h"
 #include <stdlib.h>
 #include <string.h>
 #include <ctype.h>
@@ -334,19 +335,19 @@ Token lexer_next(Lexer *l) {
 Token *lexer_tokenize(Lexer *l, int *count) {
     int cap = 256;
     int n = 0;
-    Token *tokens = malloc(sizeof(Token) * (size_t)cap);
+    Token *tokens = xmalloc(sizeof(Token) * (size_t)cap);
 
     while (1) {
         if (n >= cap) {
             cap *= 2;
-            tokens = realloc(tokens, sizeof(Token) * (size_t)cap);
+            tokens = xrealloc(tokens, sizeof(Token) * (size_t)cap);
         }
         tokens[n] = lexer_next(l);
         if (tokens[n].type == TOK_EOF) { n++; break; }
         if (tokens[n].type == TOK_ERROR) {
             fprintf(stderr, "Lexer error at line %d: %.*s\n",
                     tokens[n].line, (int)tokens[n].length, tokens[n].start);
-            free(tokens);
+            xfree(tokens);
             *count = 0;
             return NULL;
         }

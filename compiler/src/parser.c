@@ -3,6 +3,7 @@
 #endif
 
 #include "parser.h"
+#include "util.h"
 #include "error.h"
 #include <stdio.h>
 #include <stdlib.h>
@@ -79,7 +80,7 @@ static char *tok_str_value(Token t) {
 
 // Strip underscores from numeric literal for strtoll/strtod
 static char *tok_num_str(Token t) {
-    char *buf = malloc(t.length + 1);
+    char *buf = xmalloc(t.length + 1);
     size_t j = 0;
     for (size_t i = 0; i < t.length; i++) {
         if (t.start[i] != '_') buf[j++] = t.start[i];
@@ -130,12 +131,12 @@ static AstType *parse_type(Parser *p) {
     // Tuple type: (T1, T2, ...)
     if (match(p, TOK_LPAREN)) {
         int cap = 4, count = 0;
-        AstType **elems = malloc(sizeof(AstType *) * (size_t)cap);
+        AstType **elems = xmalloc(sizeof(AstType *) * (size_t)cap);
         if (!check(p, TOK_RPAREN)) {
             do {
                 if (count >= cap) {
                     cap *= 2;
-                    elems = realloc(elems, sizeof(AstType *) * (size_t)cap);
+                    elems = xrealloc(elems, sizeof(AstType *) * (size_t)cap);
                 }
                 elems[count++] = parse_type(p);
             } while (match(p, TOK_COMMA));
@@ -187,7 +188,7 @@ static AstNode *parse_fstring(Parser *p, Token t) {
             }
             // Build the literal with escaped braces resolved
             size_t seg_len = i - start;
-            char *buf = malloc(seg_len + 1);
+            char *buf = xmalloc(seg_len + 1);
             size_t j = 0;
             for (size_t k = start; k < i; k++) {
                 if (raw[k] == '{' && k + 1 < i && raw[k + 1] == '{') { buf[j++] = '{'; k++; }
@@ -237,7 +238,7 @@ static AstNode *parse_fstring(Parser *p, Token t) {
                 to_str_ident->as.ident.name = strdup("to_str");
                 AstNode *call = ast_new(NODE_CALL, t);
                 call->as.call.callee = to_str_ident;
-                call->as.call.args = malloc(sizeof(AstNode *));
+                call->as.call.args = xmalloc(sizeof(AstNode *));
                 call->as.call.args[0] = expr;
                 call->as.call.arg_count = 1;
 
@@ -250,7 +251,7 @@ static AstNode *parse_fstring(Parser *p, Token t) {
                     bin->as.binary.right = call;
                     result = bin;
                 }
-                free(sub_tokens);
+                xfree(sub_tokens);
             }
         } else {
             // Collect literal text until { or end
@@ -303,14 +304,14 @@ static AstNode *parse_primary(Parser *p) {
         if (errno == ERANGE) {
             warn_at(p, t, "integer literal out of range");
         }
-        free(s);
+        xfree(s);
         return n;
     }
     if (match(p, TOK_FLOAT_LIT)) {
         AstNode *n = ast_new(NODE_FLOAT_LIT, t);
         char *s = tok_num_str(t);
         n->as.float_lit.value = strtod(s, NULL);
-        free(s);
+        xfree(s);
         return n;
     }
     if (match(p, TOK_STR_LIT)) {
@@ -364,16 +365,16 @@ static AstNode *parse_primary(Parser *p) {
                     // Collect argument token spans
                     // Each argument is a span of tokens delimited by , or )
                     int arg_cap = 8;
-                    Token **arg_tokens = malloc(sizeof(Token *) * (size_t)arg_cap);
-                    int *arg_lens = malloc(sizeof(int) * (size_t)arg_cap);
+                    Token **arg_tokens = xmalloc(sizeof(Token *) * (size_t)arg_cap);
+                    int *arg_lens = xmalloc(sizeof(int) * (size_t)arg_cap);
                     int arg_count = 0;
 
                     if (!check(p, TOK_RPAREN)) {
                         while (1) {
                             if (arg_count >= arg_cap) {
                                 arg_cap *= 2;
-                                arg_tokens = realloc(arg_tokens, sizeof(Token *) * (size_t)arg_cap);
-                                arg_lens = realloc(arg_lens, sizeof(int) * (size_t)arg_cap);
+                                arg_tokens = xrealloc(arg_tokens, sizeof(Token *) * (size_t)arg_cap);
+                                arg_lens = xrealloc(arg_lens, sizeof(int) * (size_t)arg_cap);
                             }
                             int start = p->pos;
                             int depth2 = 0;
@@ -403,13 +404,13 @@ static AstNode *parse_primary(Parser *p) {
                         snprintf(msg, sizeof(msg), "rune '%s' expects %d arguments, got %d", rune->name, rune->param_count, arg_count);
                         error_at(p, t, msg);
                     }
-                        free(arg_tokens); free(arg_lens); free(name);
+                        xfree(arg_tokens); xfree(arg_lens); xfree(name);
                         return ast_new(NODE_INT_LIT, t);
                     }
 
                     // Build expanded token stream: substitute params with arg tokens
                     size_t exp_cap = (size_t)rune->body_token_count * 2 + 16;
-                    Token *expanded = malloc(sizeof(Token) * exp_cap);
+                    Token *expanded = xmalloc(sizeof(Token) * exp_cap);
                     int exp_count = 0;
 
                     for (int i = 0; i < rune->body_token_count; i++) {
@@ -423,7 +424,7 @@ static AstNode *parse_primary(Parser *p) {
                                     size_t needed = (size_t)exp_count + (size_t)arg_lens[j] + 1;
                                     if (needed >= exp_cap) {
                                         exp_cap = needed * 2;
-                                        expanded = realloc(expanded, sizeof(Token) * exp_cap);
+                                        expanded = xrealloc(expanded, sizeof(Token) * exp_cap);
                                     }
                                     for (int k = 0; k < arg_lens[j]; k++) {
                                         expanded[exp_count++] = arg_tokens[j][k];
@@ -436,7 +437,7 @@ static AstNode *parse_primary(Parser *p) {
                         if (!substituted) {
                             if ((size_t)exp_count >= exp_cap) {
                                 exp_cap *= 2;
-                                expanded = realloc(expanded, sizeof(Token) * exp_cap);
+                                expanded = xrealloc(expanded, sizeof(Token) * exp_cap);
                             }
                             expanded[exp_count++] = bt;
                         }
@@ -445,7 +446,7 @@ static AstNode *parse_primary(Parser *p) {
                     // Add EOF token
                     if ((size_t)exp_count >= exp_cap) {
                         exp_cap++;
-                        expanded = realloc(expanded, sizeof(Token) * exp_cap);
+                        expanded = xrealloc(expanded, sizeof(Token) * exp_cap);
                     }
                     Token eof_tok = {TOK_EOF, "", 0, t.line, t.col};
                     expanded[exp_count++] = eof_tok;
@@ -473,7 +474,7 @@ static AstNode *parse_primary(Parser *p) {
                             stmts[stmt_count++] = parse_statement(p);
                         }
                         result = ast_new(NODE_BLOCK, t);
-                        result->as.block.stmts = malloc(sizeof(AstNode *) * (size_t)stmt_count);
+                        result->as.block.stmts = xmalloc(sizeof(AstNode *) * (size_t)stmt_count);
                         memcpy(result->as.block.stmts, stmts, sizeof(AstNode *) * (size_t)stmt_count);
                         result->as.block.stmt_count = stmt_count;
                     } else {
@@ -485,10 +486,10 @@ static AstNode *parse_primary(Parser *p) {
                     p->count = saved_count;
                     p->pos = saved_pos;
 
-                    free(expanded);
-                    free(arg_tokens);
-                    free(arg_lens);
-                    free(name);
+                    xfree(expanded);
+                    xfree(arg_tokens);
+                    xfree(arg_lens);
+                    xfree(name);
                     return result;
                 }
                 // Not a rune — backtrack
@@ -510,12 +511,12 @@ static AstNode *parse_primary(Parser *p) {
                 int arg_cap = 4, arg_count = 0;
                 AstNode **args = NULL;
                 if (match(p, TOK_LPAREN)) {
-                    args = malloc(sizeof(AstNode *) * (size_t)arg_cap);
+                    args = xmalloc(sizeof(AstNode *) * (size_t)arg_cap);
                     if (!check(p, TOK_RPAREN)) {
                         do {
                             if (arg_count >= arg_cap) {
                                 arg_cap *= 2;
-                                args = realloc(args, sizeof(AstNode *) * (size_t)arg_cap);
+                                args = xrealloc(args, sizeof(AstNode *) * (size_t)arg_cap);
                             }
                             args[arg_count++] = parse_expr(p);
                         } while (match(p, TOK_COMMA));
@@ -565,7 +566,7 @@ static AstNode *parse_primary(Parser *p) {
                     AstNode *n = ast_new(NODE_STRUCT_LIT, t);
                     n->as.struct_lit.name = name;
                     int cap = 4, count = 0;
-                    FieldInit *fields = malloc(sizeof(FieldInit) * (size_t)cap);
+                    FieldInit *fields = xmalloc(sizeof(FieldInit) * (size_t)cap);
                     AstNode *spread = NULL;
                     do {
                         // Trailing comma: allow } after comma
@@ -578,7 +579,7 @@ static AstNode *parse_primary(Parser *p) {
                         }
                         if (count >= cap) {
                             cap *= 2;
-                            fields = realloc(fields, sizeof(FieldInit) * (size_t)cap);
+                            fields = xrealloc(fields, sizeof(FieldInit) * (size_t)cap);
                         }
                         Token fname = expect(p, TOK_IDENT, "expected field name");
                         expect(p, TOK_COLON, "expected ':' in struct literal");
@@ -604,12 +605,12 @@ static AstNode *parse_primary(Parser *p) {
     if (match(p, TOK_LBRACKET)) {
         AstNode *n = ast_new(NODE_ARRAY_LIT, t);
         int cap = 4, count = 0;
-        AstNode **elems = malloc(sizeof(AstNode *) * (size_t)cap);
+        AstNode **elems = xmalloc(sizeof(AstNode *) * (size_t)cap);
         if (!check(p, TOK_RBRACKET)) {
             do {
                 if (count >= cap) {
                     cap *= 2;
-                    elems = realloc(elems, sizeof(AstNode *) * (size_t)cap);
+                    elems = xrealloc(elems, sizeof(AstNode *) * (size_t)cap);
                 }
                 elems[count++] = parse_expr(p);
             } while (match(p, TOK_COMMA));
@@ -625,13 +626,13 @@ static AstNode *parse_primary(Parser *p) {
         if (match(p, TOK_COMMA)) {
             // Tuple literal: (e1, e2, ...)
             int cap = 4, count = 1;
-            AstNode **elems = malloc(sizeof(AstNode *) * (size_t)cap);
+            AstNode **elems = xmalloc(sizeof(AstNode *) * (size_t)cap);
             elems[0] = first;
             if (!check(p, TOK_RPAREN)) {
                 do {
                     if (count >= cap) {
                         cap *= 2;
-                        elems = realloc(elems, sizeof(AstNode *) * (size_t)cap);
+                        elems = xrealloc(elems, sizeof(AstNode *) * (size_t)cap);
                     }
                     elems[count++] = parse_expr(p);
                 } while (match(p, TOK_COMMA));
@@ -673,12 +674,12 @@ static AstNode *parse_call(Parser *p) {
     while (true) {
         if (match(p, TOK_LPAREN)) {
             int cap = 4, count = 0;
-            AstNode **args = malloc(sizeof(AstNode *) * (size_t)cap);
+            AstNode **args = xmalloc(sizeof(AstNode *) * (size_t)cap);
             if (!check(p, TOK_RPAREN)) {
                 do {
                     if (count >= cap) {
                         cap *= 2;
-                        args = realloc(args, sizeof(AstNode *) * (size_t)cap);
+                        args = xrealloc(args, sizeof(AstNode *) * (size_t)cap);
                     }
                     args[count++] = parse_expr(p);
                 } while (match(p, TOK_COMMA));
@@ -813,11 +814,11 @@ static AstNode *parse_block(Parser *p) {
     expect(p, TOK_LBRACE, "expected '{'");
     AstNode *block = ast_new(NODE_BLOCK, previous(p));
     int cap = 8, count = 0;
-    AstNode **stmts = malloc(sizeof(AstNode *) * (size_t)cap);
+    AstNode **stmts = xmalloc(sizeof(AstNode *) * (size_t)cap);
     while (!check(p, TOK_RBRACE) && !at_end(p)) {
         if (count >= cap) {
             cap *= 2;
-            stmts = realloc(stmts, sizeof(AstNode *) * (size_t)cap);
+            stmts = xrealloc(stmts, sizeof(AstNode *) * (size_t)cap);
         }
         stmts[count++] = parse_statement(p);
         if (p->had_error) break;
@@ -853,7 +854,7 @@ static AstNode *parse_let(Parser *p) {
         n->as.let_stmt.type = type;
         n->as.let_stmt.init = init;
         n->as.let_stmt.is_destructure = true;
-        n->as.let_stmt.names = malloc(sizeof(char *) * (size_t)name_count);
+        n->as.let_stmt.names = xmalloc(sizeof(char *) * (size_t)name_count);
         memcpy(n->as.let_stmt.names, names, sizeof(char *) * (size_t)name_count);
         n->as.let_stmt.name_count = name_count;
         return n;
@@ -942,7 +943,7 @@ static AstNode *parse_for(Parser *p) {
         n->as.for_stmt.iterable = iterable;
         n->as.for_stmt.body = body;
         n->as.for_stmt.is_destructure = true;
-        n->as.for_stmt.var_names = malloc(sizeof(char *) * (size_t)name_count);
+        n->as.for_stmt.var_names = xmalloc(sizeof(char *) * (size_t)name_count);
         memcpy(n->as.for_stmt.var_names, names, sizeof(char *) * (size_t)name_count);
         n->as.for_stmt.var_count = name_count;
         return n;
@@ -1013,12 +1014,12 @@ static AstNode *parse_match(Parser *p) {
     expect(p, TOK_LBRACE, "expected '{' after match target");
 
     int cap = 4, count = 0;
-    MatchArm *arms = malloc(sizeof(MatchArm) * (size_t)cap);
+    MatchArm *arms = xmalloc(sizeof(MatchArm) * (size_t)cap);
 
     while (!check(p, TOK_RBRACE) && !at_end(p)) {
         if (count >= cap) {
             cap *= 2;
-            arms = realloc(arms, sizeof(MatchArm) * (size_t)cap);
+            arms = xrealloc(arms, sizeof(MatchArm) * (size_t)cap);
         }
 
         // Initialize arm defaults
@@ -1053,12 +1054,12 @@ static AstNode *parse_match(Parser *p) {
 
             if (match(p, TOK_LPAREN)) {
                 int bcap = 4, bcount = 0;
-                char **bindings = malloc(sizeof(char *) * (size_t)bcap);
+                char **bindings = xmalloc(sizeof(char *) * (size_t)bcap);
                 if (!check(p, TOK_RPAREN)) {
                     do {
                         if (bcount >= bcap) {
                             bcap *= 2;
-                            bindings = realloc(bindings, sizeof(char *) * (size_t)bcap);
+                            bindings = xrealloc(bindings, sizeof(char *) * (size_t)bcap);
                         }
                         Token b = expect(p, TOK_IDENT, "expected binding name");
                         bindings[bcount++] = tok_str(b);
@@ -1181,12 +1182,12 @@ static AstNode *parse_fn_decl(Parser *p) {
     expect(p, TOK_LPAREN, "expected '('");
 
     int cap = 4, count = 0;
-    Param *params = malloc(sizeof(Param) * (size_t)cap);
+    Param *params = xmalloc(sizeof(Param) * (size_t)cap);
     if (!check(p, TOK_RPAREN)) {
         do {
             if (count >= cap) {
                 cap *= 2;
-                params = realloc(params, sizeof(Param) * (size_t)cap);
+                params = xrealloc(params, sizeof(Param) * (size_t)cap);
             }
             bool param_mut = match(p, TOK_MUT);
             Token pname = expect(p, TOK_IDENT, "expected parameter name");
@@ -1236,11 +1237,11 @@ static AstNode *parse_struct_decl(Parser *p) {
     expect(p, TOK_LBRACE, "expected '{'");
 
     int cap = 4, count = 0;
-    Param *fields = malloc(sizeof(Param) * (size_t)cap);
+    Param *fields = xmalloc(sizeof(Param) * (size_t)cap);
     while (!check(p, TOK_RBRACE) && !at_end(p)) {
         if (count >= cap) {
             cap *= 2;
-            fields = realloc(fields, sizeof(Param) * (size_t)cap);
+            fields = xrealloc(fields, sizeof(Param) * (size_t)cap);
         }
         Token fname = expect(p, TOK_IDENT, "expected field name");
         if (p->had_error) break;
@@ -1268,12 +1269,12 @@ static AstNode *parse_enum_decl(Parser *p) {
     expect(p, TOK_LBRACE, "expected '{'");
 
     int cap = 4, count = 0;
-    EnumVariant *variants = malloc(sizeof(EnumVariant) * (size_t)cap);
+    EnumVariant *variants = xmalloc(sizeof(EnumVariant) * (size_t)cap);
 
     while (!check(p, TOK_RBRACE) && !at_end(p)) {
         if (count >= cap) {
             cap *= 2;
-            variants = realloc(variants, sizeof(EnumVariant) * (size_t)cap);
+            variants = xrealloc(variants, sizeof(EnumVariant) * (size_t)cap);
         }
         Token vname = expect(p, TOK_IDENT, "expected variant name");
         if (p->had_error) break;
@@ -1283,12 +1284,12 @@ static AstNode *parse_enum_decl(Parser *p) {
 
         if (match(p, TOK_LPAREN)) {
             int fcap = 4, fcount = 0;
-            Param *fields = malloc(sizeof(Param) * (size_t)fcap);
+            Param *fields = xmalloc(sizeof(Param) * (size_t)fcap);
             if (!check(p, TOK_RPAREN)) {
                 do {
                     if (fcount >= fcap) {
                         fcap *= 2;
-                        fields = realloc(fields, sizeof(Param) * (size_t)fcap);
+                        fields = xrealloc(fields, sizeof(Param) * (size_t)fcap);
                     }
                     Token fname = expect(p, TOK_IDENT, "expected field name");
                     if (p->had_error) break;
@@ -1351,12 +1352,12 @@ static AstNode *parse_rune_decl(Parser *p) {
     // Parse parameters
     expect(p, TOK_LPAREN, "expected '(' after rune name");
     int pcap = 4, pcount = 0;
-    char **params = malloc(sizeof(char *) * (size_t)pcap);
+    char **params = xmalloc(sizeof(char *) * (size_t)pcap);
     if (!check(p, TOK_RPAREN)) {
         do {
             if (pcount >= pcap) {
                 pcap *= 2;
-                params = realloc(params, sizeof(char *) * (size_t)pcap);
+                params = xrealloc(params, sizeof(char *) * (size_t)pcap);
             }
             Token pt = expect(p, TOK_IDENT, "expected parameter name");
             params[pcount++] = tok_str(pt);
@@ -1367,7 +1368,7 @@ static AstNode *parse_rune_decl(Parser *p) {
     // Collect body tokens between { and } (track brace nesting)
     expect(p, TOK_LBRACE, "expected '{' for rune body");
     int bcap = 32, bcount = 0;
-    Token *body = malloc(sizeof(Token) * (size_t)bcap);
+    Token *body = xmalloc(sizeof(Token) * (size_t)bcap);
     int depth = 1;
     while (!at_end(p) && depth > 0) {
         Token tok = current(p);
@@ -1378,7 +1379,7 @@ static AstNode *parse_rune_decl(Parser *p) {
         }
         if (bcount >= bcap) {
             bcap *= 2;
-            body = realloc(body, sizeof(Token) * (size_t)bcap);
+            body = xrealloc(body, sizeof(Token) * (size_t)bcap);
         }
         body[bcount++] = tok;
         advance_tok(p);
@@ -1388,11 +1389,11 @@ static AstNode *parse_rune_decl(Parser *p) {
     // Register in rune table
     if (rune_count < MAX_RUNES) {
         rune_defs[rune_count].name = strdup(name);
-        rune_defs[rune_count].param_names = malloc(sizeof(char *) * (size_t)pcount);
+        rune_defs[rune_count].param_names = xmalloc(sizeof(char *) * (size_t)pcount);
         for (int i = 0; i < pcount; i++)
             rune_defs[rune_count].param_names[i] = strdup(params[i]);
         rune_defs[rune_count].param_count = pcount;
-        rune_defs[rune_count].body_tokens = malloc(sizeof(Token) * (size_t)bcount);
+        rune_defs[rune_count].body_tokens = xmalloc(sizeof(Token) * (size_t)bcount);
         memcpy(rune_defs[rune_count].body_tokens, body, sizeof(Token) * (size_t)bcount);
         rune_defs[rune_count].body_token_count = bcount;
         rune_count++;
@@ -1454,12 +1455,12 @@ AstNode *parser_parse(Parser *p) {
     rune_count = 0; // reset rune table
     AstNode *program = ast_new(NODE_PROGRAM, current(p));
     int cap = 16, count = 0;
-    AstNode **decls = malloc(sizeof(AstNode *) * (size_t)cap);
+    AstNode **decls = xmalloc(sizeof(AstNode *) * (size_t)cap);
 
     while (!at_end(p) && !p->had_error) {
         if (count >= cap) {
             cap *= 2;
-            decls = realloc(decls, sizeof(AstNode *) * (size_t)cap);
+            decls = xrealloc(decls, sizeof(AstNode *) * (size_t)cap);
         }
         decls[count++] = parse_declaration(p);
     }

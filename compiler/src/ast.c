@@ -3,6 +3,7 @@
 #endif
 
 #include "ast.h"
+#include "util.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -61,7 +62,7 @@ AstType *ast_type_tuple(AstType **elems, int count) {
 }
 
 char *ast_strdup(const char *s, size_t len) {
-    char *d = malloc(len + 1);
+    char *d = xmalloc(len + 1);
     memcpy(d, s, len);
     d[len] = '\0';
     return d;
@@ -79,7 +80,7 @@ AstType *ast_type_clone(AstType *t) {
         c->param_count = t->param_count;
         c->return_type = ast_type_clone(t->return_type);
         if (t->param_count > 0) {
-            c->param_types = malloc(sizeof(AstType *) * (size_t)t->param_count);
+            c->param_types = xmalloc(sizeof(AstType *) * (size_t)t->param_count);
             for (int i = 0; i < t->param_count; i++)
                 c->param_types[i] = ast_type_clone(t->param_types[i]);
         }
@@ -87,7 +88,7 @@ AstType *ast_type_clone(AstType *t) {
     if (t->kind == TYPE_TUPLE) {
         c->element_count = t->element_count;
         if (t->element_count > 0) {
-            c->element_types = malloc(sizeof(AstType *) * (size_t)t->element_count);
+            c->element_types = xmalloc(sizeof(AstType *) * (size_t)t->element_count);
             for (int i = 0; i < t->element_count; i++)
                 c->element_types[i] = ast_type_clone(t->element_types[i]);
         }
@@ -480,22 +481,22 @@ void ast_print(AstNode *node, int ind) {
 
 void ast_type_free(AstType *type) {
     if (!type) return;
-    free(type->name);
+    xfree(type->name);
     ast_type_free(type->element);
     ast_type_free(type->ok_type);
     ast_type_free(type->err_type);
     if (type->kind == TYPE_FN) {
         for (int i = 0; i < type->param_count; i++)
             ast_type_free(type->param_types[i]);
-        free(type->param_types);
+        xfree(type->param_types);
         ast_type_free(type->return_type);
     }
     if (type->kind == TYPE_TUPLE) {
         for (int i = 0; i < type->element_count; i++)
             ast_type_free(type->element_types[i]);
-        free(type->element_types);
+        xfree(type->element_types);
     }
-    free(type);
+    xfree(type);
 }
 
 void ast_free(AstNode *node) {
@@ -505,37 +506,37 @@ void ast_free(AstNode *node) {
     case NODE_PROGRAM:
         for (int i = 0; i < node->as.program.decl_count; i++)
             ast_free(node->as.program.decls[i]);
-        free(node->as.program.decls);
+        xfree(node->as.program.decls);
         break;
     case NODE_FN_DECL:
-        free(node->as.fn_decl.name);
+        xfree(node->as.fn_decl.name);
         for (int i = 0; i < node->as.fn_decl.param_count; i++) {
-            free(node->as.fn_decl.params[i].name);
+            xfree(node->as.fn_decl.params[i].name);
             ast_type_free(node->as.fn_decl.params[i].type);
         }
-        free(node->as.fn_decl.params);
+        xfree(node->as.fn_decl.params);
         ast_type_free(node->as.fn_decl.return_type);
         ast_free(node->as.fn_decl.body);
         break;
     case NODE_STRUCT_DECL:
-        free(node->as.struct_decl.name);
+        xfree(node->as.struct_decl.name);
         for (int i = 0; i < node->as.struct_decl.field_count; i++) {
-            free(node->as.struct_decl.fields[i].name);
+            xfree(node->as.struct_decl.fields[i].name);
             ast_type_free(node->as.struct_decl.fields[i].type);
         }
-        free(node->as.struct_decl.fields);
+        xfree(node->as.struct_decl.fields);
         break;
     case NODE_BLOCK:
         for (int i = 0; i < node->as.block.stmt_count; i++)
             ast_free(node->as.block.stmts[i]);
-        free(node->as.block.stmts);
+        xfree(node->as.block.stmts);
         break;
     case NODE_LET_STMT:
-        free(node->as.let_stmt.name);
+        xfree(node->as.let_stmt.name);
         if (node->as.let_stmt.is_destructure) {
             for (int i = 0; i < node->as.let_stmt.name_count; i++)
-                free(node->as.let_stmt.names[i]);
-            free(node->as.let_stmt.names);
+                xfree(node->as.let_stmt.names[i]);
+            xfree(node->as.let_stmt.names);
         }
         ast_type_free(node->as.let_stmt.type);
         ast_free(node->as.let_stmt.init);
@@ -558,11 +559,11 @@ void ast_free(AstNode *node) {
         ast_free(node->as.do_while_stmt.condition);
         break;
     case NODE_FOR_STMT:
-        free(node->as.for_stmt.var_name);
+        xfree(node->as.for_stmt.var_name);
         if (node->as.for_stmt.is_destructure) {
             for (int i = 0; i < node->as.for_stmt.var_count; i++)
-                free(node->as.for_stmt.var_names[i]);
-            free(node->as.for_stmt.var_names);
+                xfree(node->as.for_stmt.var_names[i]);
+            xfree(node->as.for_stmt.var_names);
         }
         ast_free(node->as.for_stmt.start);
         ast_free(node->as.for_stmt.end);
@@ -576,7 +577,7 @@ void ast_free(AstNode *node) {
         ast_free(node->as.expr_stmt.expr);
         break;
     case NODE_EMIT_STMT:
-        free(node->as.emit_stmt.content);
+        xfree(node->as.emit_stmt.content);
         break;
     case NODE_BINARY:
         ast_free(node->as.binary.left);
@@ -589,71 +590,71 @@ void ast_free(AstNode *node) {
         ast_free(node->as.call.callee);
         for (int i = 0; i < node->as.call.arg_count; i++)
             ast_free(node->as.call.args[i]);
-        free(node->as.call.args);
+        xfree(node->as.call.args);
         break;
     case NODE_FIELD_ACCESS:
         ast_free(node->as.field_access.object);
-        free(node->as.field_access.field);
+        xfree(node->as.field_access.field);
         break;
     case NODE_INDEX:
         ast_free(node->as.index_expr.object);
         ast_free(node->as.index_expr.index);
         break;
-    case NODE_STR_LIT: free(node->as.str_lit.value); break;
-    case NODE_IDENT: free(node->as.ident.name); break;
+    case NODE_STR_LIT: xfree(node->as.str_lit.value); break;
+    case NODE_IDENT: xfree(node->as.ident.name); break;
     case NODE_ARRAY_LIT:
         for (int i = 0; i < node->as.array_lit.count; i++)
             ast_free(node->as.array_lit.elements[i]);
-        free(node->as.array_lit.elements);
+        xfree(node->as.array_lit.elements);
         break;
     case NODE_STRUCT_LIT:
-        free(node->as.struct_lit.name);
+        xfree(node->as.struct_lit.name);
         for (int i = 0; i < node->as.struct_lit.field_count; i++) {
-            free(node->as.struct_lit.fields[i].name);
+            xfree(node->as.struct_lit.fields[i].name);
             ast_free(node->as.struct_lit.fields[i].value);
         }
-        free(node->as.struct_lit.fields);
+        xfree(node->as.struct_lit.fields);
         ast_free(node->as.struct_lit.spread);
         break;
     case NODE_ENUM_DECL:
-        free(node->as.enum_decl.name);
+        xfree(node->as.enum_decl.name);
         for (int i = 0; i < node->as.enum_decl.variant_count; i++) {
-            free(node->as.enum_decl.variants[i].name);
+            xfree(node->as.enum_decl.variants[i].name);
             for (int j = 0; j < node->as.enum_decl.variants[i].field_count; j++) {
-                free(node->as.enum_decl.variants[i].fields[j].name);
+                xfree(node->as.enum_decl.variants[i].fields[j].name);
                 ast_type_free(node->as.enum_decl.variants[i].fields[j].type);
             }
-            free(node->as.enum_decl.variants[i].fields);
+            xfree(node->as.enum_decl.variants[i].fields);
         }
-        free(node->as.enum_decl.variants);
+        xfree(node->as.enum_decl.variants);
         break;
     case NODE_MATCH:
         ast_free(node->as.match_stmt.target);
         for (int i = 0; i < node->as.match_stmt.arm_count; i++) {
-            free(node->as.match_stmt.arms[i].enum_name);
-            free(node->as.match_stmt.arms[i].variant_name);
+            xfree(node->as.match_stmt.arms[i].enum_name);
+            xfree(node->as.match_stmt.arms[i].variant_name);
             for (int j = 0; j < node->as.match_stmt.arms[i].binding_count; j++)
-                free(node->as.match_stmt.arms[i].bindings[j]);
-            free(node->as.match_stmt.arms[i].bindings);
+                xfree(node->as.match_stmt.arms[i].bindings[j]);
+            xfree(node->as.match_stmt.arms[i].bindings);
             if (node->as.match_stmt.arms[i].binding_types) {
                 for (int j = 0; j < node->as.match_stmt.arms[i].binding_count; j++)
                     ast_type_free(node->as.match_stmt.arms[i].binding_types[j]);
-                free(node->as.match_stmt.arms[i].binding_types);
+                xfree(node->as.match_stmt.arms[i].binding_types);
             }
             ast_free(node->as.match_stmt.arms[i].pattern_expr);
             ast_free(node->as.match_stmt.arms[i].body);
         }
-        free(node->as.match_stmt.arms);
+        xfree(node->as.match_stmt.arms);
         break;
     case NODE_ENUM_INIT:
-        free(node->as.enum_init.enum_name);
-        free(node->as.enum_init.variant_name);
+        xfree(node->as.enum_init.enum_name);
+        xfree(node->as.enum_init.variant_name);
         for (int i = 0; i < node->as.enum_init.arg_count; i++)
             ast_free(node->as.enum_init.args[i]);
-        free(node->as.enum_init.args);
+        xfree(node->as.enum_init.args);
         break;
     case NODE_IMPORT:
-        free(node->as.import_decl.path);
+        xfree(node->as.import_decl.path);
         break;
     case NODE_OK_EXPR:
     case NODE_ERR_EXPR:
@@ -661,23 +662,23 @@ void ast_free(AstNode *node) {
         break;
     case NODE_LAMBDA:
         for (int i = 0; i < node->as.lambda.param_count; i++) {
-            free(node->as.lambda.params[i].name);
+            xfree(node->as.lambda.params[i].name);
             ast_type_free(node->as.lambda.params[i].type);
         }
-        free(node->as.lambda.params);
+        xfree(node->as.lambda.params);
         ast_type_free(node->as.lambda.return_type);
         ast_free(node->as.lambda.body);
         for (int i = 0; i < node->as.lambda.capture_count; i++) {
-            free(node->as.lambda.captures[i]);
+            xfree(node->as.lambda.captures[i]);
             ast_type_free(node->as.lambda.capture_types[i]);
         }
-        free(node->as.lambda.captures);
-        free(node->as.lambda.capture_types);
+        xfree(node->as.lambda.captures);
+        xfree(node->as.lambda.capture_types);
         break;
     case NODE_TUPLE_LIT:
         for (int i = 0; i < node->as.tuple_lit.count; i++)
             ast_free(node->as.tuple_lit.elements[i]);
-        free(node->as.tuple_lit.elements);
+        xfree(node->as.tuple_lit.elements);
         break;
     case NODE_IF_EXPR:
         ast_free(node->as.if_expr.condition);
@@ -685,19 +686,19 @@ void ast_free(AstNode *node) {
         ast_free(node->as.if_expr.else_expr);
         break;
     case NODE_RUNE_DECL:
-        free(node->as.rune_decl.name);
+        xfree(node->as.rune_decl.name);
         for (int i = 0; i < node->as.rune_decl.param_count; i++)
-            free(node->as.rune_decl.param_names[i]);
-        free(node->as.rune_decl.param_names);
-        free(node->as.rune_decl.body_tokens);
+            xfree(node->as.rune_decl.param_names[i]);
+        xfree(node->as.rune_decl.param_names);
+        xfree(node->as.rune_decl.body_tokens);
         break;
     case NODE_CONST_DECL:
-        free(node->as.const_decl.name);
+        xfree(node->as.const_decl.name);
         ast_type_free(node->as.const_decl.type);
         ast_free(node->as.const_decl.value);
         break;
     case NODE_TYPE_ALIAS:
-        free(node->as.type_alias.name);
+        xfree(node->as.type_alias.name);
         ast_type_free(node->as.type_alias.type);
         break;
     case NODE_DEFER_STMT:
@@ -710,5 +711,5 @@ void ast_free(AstNode *node) {
     case NODE_CONTINUE_STMT:
         break;
     }
-    free(node);
+    xfree(node);
 }
