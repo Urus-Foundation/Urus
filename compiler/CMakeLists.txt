@@ -96,7 +96,7 @@ endforeach()
 file(GLOB RUN_TESTS "${TESTS_DIR}/run/*.urus")
 foreach(test_file ${RUN_TESTS})
     get_filename_component(test_name ${test_file} NAME_WE)
-    set(expected_file "${TESTS_DIR}/run/${test_name}.expected")
+    set(expected_file "${TESTS_DIR}/run/expected/${test_name}.expected")
 
     if(EXISTS ${expected_file})
         add_test(NAME run_${test_name}
@@ -107,7 +107,7 @@ foreach(test_file ${RUN_TESTS})
                 -DINCLUDE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/include
                 -DWORKING_DIR=${CMAKE_CURRENT_BINARY_DIR}
                 -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
-                -P "${TESTS_DIR}/run_test.cmake"
+                -P "${TESTS_DIR}/run_tests.cmake"
         )
     endif()
 endforeach()
