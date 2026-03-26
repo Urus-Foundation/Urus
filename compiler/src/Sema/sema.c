@@ -313,8 +313,8 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node) {
             }
         }
 
-		// Inject default parameter types to args
-		if (node->as.call.arg_count < sym->param_count) {
+        // Inject default parameter values to args
+        if (node->as.call.arg_count < sym->param_count && node->as.call.arg_count >= min_args) {
             AstNode **new_args = xmalloc(sizeof(AstNode *) * (size_t)sym->param_count);
 
             for (int i = 0; i < node->as.call.arg_count; i++) {
@@ -325,13 +325,15 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node) {
                 if (sym->params[i].default_value != NULL) {
                     new_args[i] = sym->params[i].default_value;
                     new_args[i]->ref_count++;
+                } else {
+                    new_args[i] = NULL;
                 }
             }
 
             xfree(node->as.call.args);
             node->as.call.args = new_args;
             node->as.call.arg_count = sym->param_count;
-		}
+        }
 
         // Special: unwrap returns the ok_type of the Result argument
         AstType *final_return = sym->return_type;

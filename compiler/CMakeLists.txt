@@ -52,10 +52,10 @@ if(UNIX AND NOT APPLE)
     target_link_libraries(urusc PRIVATE m)
 endif()
 
-# _._. Install urusc ._._
+# Install urusc
 install(TARGETS urusc DESTINATION bin)
 
-# _._. Install stdlib/* to local lib ._._
+# Install stdlib/* to local lib
 if(WIN32)
     # Windows: Program Files\Urusc\lib
     # Path separator already handled by CMake
@@ -71,3 +71,43 @@ endif()
 install(DIRECTORY "${CMAKE_CURRENT_SOURCE_DIR}/stdlib/"
         DESTINATION "${URUS_LIB_DIR}"
         FILES_MATCHING PATTERN "*.urus")
+
+# CTest integration
+enable_testing()
+
+set(TESTS_DIR "${CMAKE_CURRENT_SOURCE_DIR}/../tests")
+
+# Valid compilation tests (should pass)
+file(GLOB VALID_TESTS "${TESTS_DIR}/valid/*.urus")
+foreach(test_file ${VALID_TESTS})
+    get_filename_component(test_name ${test_file} NAME_WE)
+    add_test(NAME valid_${test_name} COMMAND urusc ${test_file} --emit-c)
+endforeach()
+
+# Invalid compilation tests (should fail)
+file(GLOB INVALID_TESTS "${TESTS_DIR}/invalid/*.urus")
+foreach(test_file ${INVALID_TESTS})
+    get_filename_component(test_name ${test_file} NAME_WE)
+    add_test(NAME invalid_${test_name} COMMAND urusc ${test_file} --emit-c)
+    set_tests_properties(invalid_${test_name} PROPERTIES WILL_FAIL TRUE)
+endforeach()
+
+# Run tests (compile, run, check output)
+file(GLOB RUN_TESTS "${TESTS_DIR}/run/*.urus")
+foreach(test_file ${RUN_TESTS})
+    get_filename_component(test_name ${test_file} NAME_WE)
+    set(expected_file "${TESTS_DIR}/run/${test_name}.expected")
+
+    if(EXISTS ${expected_file})
+        add_test(NAME run_${test_name}
+            COMMAND ${CMAKE_COMMAND}
+                -DURUSC=$<TARGET_FILE:urusc>
+                -DFILE=${test_file}
+                -DEXPECTED=${expected_file}
+                -DINCLUDE_DIR=${CMAKE_CURRENT_SOURCE_DIR}/include
+                -DWORKING_DIR=${CMAKE_CURRENT_BINARY_DIR}
+                -DCMAKE_C_COMPILER=${CMAKE_C_COMPILER}
+                -P "${TESTS_DIR}/run_test.cmake"
+        )
+    endif()
+endforeach()
