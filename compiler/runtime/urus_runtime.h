@@ -282,6 +282,11 @@ static void urus_array_set(urus_array *arr, size_t index, const void *elem) {
         fprintf(stderr, "Error: array index %zu out of bounds (len=%zu)\n", index, arr->len);
         exit(1);
     }
+    // drop old elements
+    if (arr->elem_drop) {
+        void *obj = *(void**)((char*)arr->data + (index * arr->elem_size));
+        if (obj) arr->elem_drop(&obj);
+    }
     memcpy((char *)arr->data + index * arr->elem_size, elem, arr->elem_size);
 }
 
@@ -445,15 +450,17 @@ typedef union {
 
 typedef struct {
     int tag;  // 0 = Ok, 1 = Err
+    urus_drop_fn ok_drop;
     union {
         urus_box ok;
         urus_str *err;
     } data;
 } urus_result;
 
-static urus_result *urus_result_ok(urus_box *val) {
+static urus_result *urus_result_ok(urus_box *val, urus_drop_fn ok_drop) {
     urus_result *r = (urus_result *)urus_alloc(sizeof(urus_result));
     r->tag = 0;
+    r->ok_drop = ok_drop;
     r->data.ok = *val;
     return r;
 }
@@ -521,8 +528,9 @@ static void urus_result_drop(urus_result **rp) {
         urus_result *r = *rp;
         if (r->tag == 1 && r->data.err) {
             urus_str_drop(&r->data.err);
+        } else if (r->tag == 0 && r->ok_drop) {
+            if (r->data.ok.as_ptr) r->ok_drop(&r->data.ok.as_ptr);
         }
-        // TODO: if the OK result have a pointer heap, handle oK result here (drop for ok)
         free(r);
         *rp = NULL;
     }

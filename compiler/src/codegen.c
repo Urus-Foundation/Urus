@@ -17,6 +17,7 @@ static void gen_block(CodeBuf *buf, AstNode *node);
 static void gen_type(CodeBuf *buf, AstType *t);
 static void emit(CodeBuf *buf, const char *fmt, ...);
 static void emit_indent(CodeBuf *buf);
+static bool type_needs_drop(AstType *t);
 
 // ---- Defer tracking ----
 static AstNode *defer_stack[64];
@@ -31,7 +32,7 @@ static void emit_defers(CodeBuf *buf) {
 
 // ---- Tuple typedef tracking ----
 static bool tuple_needs_drop(AstType *t);
-static bool type_needs_rc(AstType *t);
+static bool type_needs_drop(AstType *t);
 
 static const char *tuple_type_name(AstType *t) {
     static char buf[512];
@@ -270,24 +271,24 @@ static void emit_indent(CodeBuf *buf) {
     for (int i = 0; i < buf->indent; i++) emit(buf, "    ");
 }
 
+static void emit_type_drop(CodeBuf *buf, AstType *t) {
+    if (!t) return;
+    if (!type_needs_drop(t)) return;
+
+    char dtor[128];
+    if (t->kind == TYPE_STR) strcpy(dtor, "urus_str_drop");
+    else if (t->kind == TYPE_ARRAY) strcpy(dtor, "urus_array_drop");
+    else if (t->kind == TYPE_RESULT) strcpy(dtor, "urus_result_drop");
+    else if (t->kind == TYPE_NAMED) snprintf(dtor, sizeof(dtor), "%s_drop", t->name);
+
+    emit(buf, "%s", dtor);
+}
+
 static void emit_type_drop_cname(CodeBuf *buf, AstType *t, const char *c_name) {
     if (!t) return;
-    switch(t->kind) {
-    case TYPE_STR:
-        emit(buf, "urus_str_drop(&%s);\n", c_name);
-        break;
-    case TYPE_ARRAY:
-        emit(buf, "urus_array_drop(&%s);\n", c_name);
-        break;
-    case TYPE_NAMED:
-        emit(buf, "%s_drop(&%s);\n", t->name, c_name);
-        break;
-    case TYPE_RESULT:
-        emit(buf, "urus_result_drop(&%s);\n", c_name);
-        break;
-    default:
-        break;
-    }
+    if (!type_needs_drop(t)) return;
+    emit_type_drop(buf, t);
+    emit(buf, "(&%s);\n", c_name);
 }
 
 // ---- Type emission ----
@@ -310,7 +311,7 @@ static void gen_type(CodeBuf *buf, AstType *t) {
     }
 }
 
-static bool type_needs_rc(AstType *t) {
+static bool type_needs_drop(AstType *t) {
     if (!t) return false;
     if (t->kind == TYPE_STR || t->kind == TYPE_ARRAY ||
             t->kind == TYPE_NAMED || t->kind == TYPE_RESULT) return true;
@@ -320,7 +321,7 @@ static bool type_needs_rc(AstType *t) {
 
 static bool tuple_needs_drop(AstType *t) {
     for (int i = 0; i < t->element_count; i++) {
-        if (type_needs_rc(t->element_types[i])) return true;
+        if (type_needs_drop(t->element_types[i])) return true;
     }
     return false;
 }
@@ -690,19 +691,20 @@ static int gen_expr_pre(CodeBuf *buf, AstNode *node) {
         if (node->resolved_type && node->resolved_type->kind == TYPE_ARRAY) {
             elem = node->resolved_type->element;
         }
-        char dtor_str[128] = "NULL";
-        if (elem && type_needs_rc(elem)) {
-            if (elem->kind == TYPE_STR) strcpy(dtor_str, "(urus_drop_fn)urus_str_drop");
-            else if (elem->kind == TYPE_ARRAY) strcpy(dtor_str, "(urus_drop_fn)urus_array_drop");
-            else if (elem->kind == TYPE_RESULT) strcpy(dtor_str, "(urus_drop_fn)urus_result_drop");
-            else if (elem->kind == TYPE_NAMED) snprintf(dtor_str, sizeof(dtor_str), "(urus_drop_fn)%s_drop", elem->name);
-        }
 
         const char *sz = elem_sizeof(elem);
         const char *ctype = elem_ctype(elem);
+
         emit_indent(buf);
-        emit(buf, "urus_array* _urus_arr_%d = urus_array_new(%s, %d, %s);\n\n",
-             tmp, sz, node->as.array_lit.count > 0 ? node->as.array_lit.count : 4, dtor_str);
+        emit(buf, "urus_array* _urus_arr_%d = urus_array_new(%s, %d, ",
+             tmp, sz, node->as.array_lit.count > 0 ? node->as.array_lit.count : 4);
+        if (elem && type_needs_drop(elem)) {
+            emit(buf, "(urus_drop_fn)");
+            emit_type_drop(buf, elem);
+        } else {
+            emit(buf, "NULL");
+        }
+        emit(buf, ");\n");
         for (int i = 0; i < node->as.array_lit.count; i++) {
             emit_indent(buf);
             emit(buf, "urus_array_push(_urus_arr_%d, &(%s){", tmp, ctype);
@@ -740,7 +742,7 @@ static int gen_expr_pre(CodeBuf *buf, AstNode *node) {
             gen_expr(buf, node->as.struct_lit.fields[i].value);
             emit(buf, ";\n");
 
-            if (type_needs_rc(node->as.struct_lit.fields[i].value->resolved_type) &&
+            if (type_needs_drop(node->as.struct_lit.fields[i].value->resolved_type) &&
                     node->as.struct_lit.fields[i].value->kind == NODE_IDENT) {
                 emit_indent(buf);
                 emit(buf, "%s = NULL; // move to struct field\n", node->as.struct_lit.fields[i].value->as.ident.name);
@@ -767,7 +769,7 @@ static int gen_expr_pre(CodeBuf *buf, AstNode *node) {
             gen_expr(buf, node->as.enum_init.args[i]);
             emit(buf, ";\n");
             if (node->as.enum_init.args[i]->resolved_type &&
-                    type_needs_rc(node->as.enum_init.args[i]->resolved_type) &&
+                    type_needs_drop(node->as.enum_init.args[i]->resolved_type) &&
                     node->as.enum_init.args[i]->kind == NODE_IDENT) {
                 emit_indent(buf);
                 emit(buf, "%s = NULL; // move to enum variant\n", node->as.enum_init.args[i]->as.ident.name);
@@ -786,20 +788,30 @@ static int gen_expr_pre(CodeBuf *buf, AstNode *node) {
         if (val_type && val_type->kind == TYPE_FLOAT) {
             emit(buf, "&(urus_box){.as_float = ");
             gen_expr(buf, node->as.result_expr.value);
-            emit(buf, "});\n");
+            emit(buf, "}");
         } else if (val_type && val_type->kind == TYPE_BOOL) {
             emit(buf, "&(urus_box){.as_bool = ");
             gen_expr(buf, node->as.result_expr.value);
-            emit(buf, "});\n");
+            emit(buf, "}");
         } else if (val_type && (val_type->kind == TYPE_STR || val_type->kind == TYPE_NAMED ||
                                 val_type->kind == TYPE_ARRAY)) {
             emit(buf, "&(urus_box){.as_ptr = (void*)(");
             gen_expr(buf, node->as.result_expr.value);
-            emit(buf, ")});\n");
+            emit(buf, ")}");
         } else {
             emit(buf, "&(urus_box){.as_int = (int64_t)(");
             gen_expr(buf, node->as.result_expr.value);
-            emit(buf, ")});\n");
+            emit(buf, ")}");
+        }
+
+        // fill ok_drop
+        if (val_type && (val_type->kind == TYPE_STR || val_type->kind == TYPE_NAMED ||
+                         val_type->kind == TYPE_ARRAY)) {
+            emit(buf, ", (urus_drop_fn)");
+            emit_type_drop(buf, val_type);
+            emit(buf, ");\n");
+        } else {
+            emit(buf, ", NULL);\n");
         }
         return tmp;
     }
@@ -867,13 +879,14 @@ static void gen_stmt(CodeBuf *buf, AstNode *node) {
             for (int i = 0; i < node->as.let_stmt.name_count; i++) {
                 AstType *ft = tuple_t->element_types[i];
                 emit_indent(buf);
-                if (type_needs_rc(ft)) {
+                if (type_needs_drop(ft)) {
                     const char *dtor = "NULL";
                     if (ft->kind == TYPE_STR) dtor = "urus_str_drop";
                     else if (ft->kind == TYPE_ARRAY) dtor = "urus_array_drop";
                     else if (ft->kind == TYPE_RESULT) dtor = "urus_result_drop";
                     else if (ft->kind == TYPE_NAMED) dtor = NULL;
                     else if (ft->kind == TYPE_TUPLE) dtor = NULL;
+
                     if (dtor) emit(buf, "URUS_RAII(%s) ", dtor);
                     else if (ft->kind == TYPE_NAMED) emit(buf, "URUS_RAII(%s_drop) ", ft->name);
                     else if (ft->kind == TYPE_TUPLE) emit(buf, "URUS_RAII(%s_drop) ", tuple_type_name(ft));
@@ -887,7 +900,7 @@ static void gen_stmt(CodeBuf *buf, AstNode *node) {
         emit_indent(buf);
 
         // Emit RAII auto destruct __attribute((cleanup()))
-        bool needs_rc = type_needs_rc(node->as.let_stmt.type);
+        bool needs_rc = type_needs_drop(node->as.let_stmt.type);
         if (needs_rc) {
             const char *dtor = "NULL";
             if (node->as.let_stmt.type->kind == TYPE_STR) dtor = "urus_str_drop";
@@ -1081,7 +1094,7 @@ static void gen_stmt(CodeBuf *buf, AstNode *node) {
             gen_expr(buf, node->as.return_stmt.value);
             emit(buf, ";\n");
 
-            if (type_needs_rc(t) && node->as.return_stmt.value->kind == NODE_IDENT) {
+            if (type_needs_drop(t) && node->as.return_stmt.value->kind == NODE_IDENT) {
                 emit_indent(buf);
                 emit(buf, "%s = NULL; // move to _urus_ret_%d\n", node->as.return_stmt.value->as.ident.name, tmp);
             }
@@ -1420,7 +1433,7 @@ void codegen_generate(CodeBuf *buf, AstNode *program) {
             emit(buf, "    if (obj && *obj) {\n");
             for (int j = 0; j < d->as.struct_decl.field_count; j++) {
                 AstType *ft = d->as.struct_decl.fields[j].type;
-                if (type_needs_rc(ft)) {
+                if (type_needs_drop(ft)) {
                     char field_acc[256];
                     snprintf(field_acc, sizeof(field_acc), "(*obj)->%s", d->as.struct_decl.fields[j].name);
                     emit(buf, "        ");
@@ -1449,7 +1462,7 @@ void codegen_generate(CodeBuf *buf, AstNode *program) {
                 if (v->field_count > 0) {
                     emit(buf, "            case %s_TAG_%s:\n", d->as.enum_decl.name, v->name);
                     for (int k = 0; k < v->field_count; k++) {
-                        if (type_needs_rc(v->fields[k].type)) {
+                        if (type_needs_drop(v->fields[k].type)) {
                             char field_acc[256];
                             snprintf(field_acc, sizeof(field_acc), "(*obj)->data.%s.f%d", v->name, k);
                             emit(buf, "                ");
