@@ -1,0 +1,7 @@
+// define a macro, this case use area of square
+rune square(x) {x*x}
+
+fn main(): void {
+  // use macro with a parameter
+  print(square!(5));
+}

@@ -1,0 +1,12 @@
+// define odd or even with macro
+rune check_number(x){
+  if number % 2 == 0{
+    print("even")
+  } else print("odd")
+}
+
+// use macro 
+fn main(){
+  print(check_number!(4));
+  print(check_number!(5))
+}
