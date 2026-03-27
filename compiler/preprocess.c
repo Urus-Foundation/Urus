@@ -19,15 +19,7 @@
  * limitations under the License.
  */
 
-#include "preprocess.h"
-#include "ast.h"
-#include "common.h"
-#include "lexer.h"
-#include "parser.h"
-#include "util.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "urusc.h"
 
 // --- Import resolution ---
 

@@ -19,14 +19,9 @@
  * limitations under the License.
  */
 
-#ifndef _WIN32
-#define _POSIX_C_SOURCE 200809L
-#endif
+#include "urusc.h"
 
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
-
+// For command executing
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
 #define NOGDI
@@ -36,20 +31,11 @@
 #undef TokenType
 #include <process.h>
 #else
+// Uses fork, execvp() to avoid command injection
 #include <limits.h>
 #include <sys/wait.h>
 #include <unistd.h>
 #endif
-
-#include "ast.h"
-#include "codegen.h"
-#include "common.h"
-#include "config.h"
-#include "lexer.h"
-#include "parser.h"
-#include "preprocess.h"
-#include "sema.h"
-#include "util.h"
 
 // Find gcc executable, trying common paths on Windows
 static const char *find_gcc(void)

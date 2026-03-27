@@ -19,18 +19,7 @@
  * limitations under the License.
  */
 
-#ifndef _WIN32
-#define _POSIX_C_SOURCE 200809L
-#endif
-
-#include "sema.h"
-#include "./scope.h"
-#include "error.h"
-#include "util.h"
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "urusc.h"
 
 // ---- Reporting system ----
 
@@ -96,6 +85,55 @@ static AstType *sema_resolve_type(SemaCtx *ctx, AstType *t)
             t->element_types[i] = sema_resolve_type(ctx, t->element_types[i]);
     }
     return t;
+}
+
+// ---- Scope management ---
+
+SemaScope *scope_new(SemaScope *parent)
+{
+    SemaScope *s = calloc(1, sizeof(SemaScope));
+    s->parent = parent;
+    s->cap = 8;
+    s->syms = xmalloc(sizeof(SemaSymbol) * (size_t)s->cap);
+    return s;
+}
+
+void scope_free(SemaScope *s)
+{
+    xfree(s->syms);
+    xfree(s);
+}
+
+SemaSymbol *scope_lookup_local(SemaScope *s, const char *name)
+{
+    for (int i = 0; i < s->count; i++) {
+        if (strcmp(s->syms[i].name, name) == 0)
+            return &s->syms[i];
+    }
+    return NULL;
+}
+
+SemaSymbol *scope_lookup(SemaScope *s, const char *name)
+{
+    for (SemaScope *cur = s; cur; cur = cur->parent) {
+        SemaSymbol *sym = scope_lookup_local(cur, name);
+        if (sym)
+            return sym;
+    }
+    return NULL;
+}
+
+SemaSymbol *scope_add(SemaScope *s, const char *name, Token tok)
+{
+    if (s->count >= s->cap) {
+        s->cap *= 2;
+        s->syms = xrealloc(s->syms, sizeof(SemaSymbol) * (size_t)s->cap);
+    }
+    SemaSymbol *sym = &s->syms[s->count++];
+    memset(sym, 0, sizeof(SemaSymbol));
+    sym->name = (char *)name;
+    sym->tok = tok;
+    return sym;
 }
 
 // ---- Expression type checking ----

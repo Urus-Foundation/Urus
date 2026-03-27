@@ -5,7 +5,7 @@ set(PROJECT_VERSION_TAGS "")
 set(CMAKE_C_STANDARD 11) # -std=c11
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-configure_file(include/config.h.in config.h)
+configure_file(config.h.in config.h)
 
 if(MSVC)
     add_compile_options(/W4)
@@ -29,23 +29,21 @@ add_custom_command(
 
 # source
 set(SOURCES
-    src/main.c
-    src/lexer.c
-    src/ast.c
-    src/parser.c
-    src/util.c
-    src/error.c
-    src/Sema/sema.c
-    src/Sema/scope.c
-    src/Sema/builtins.c
-    src/codegen.c
-    src/preprocess.c
+    urusc.c
+    lexer.c
+    ast.c
+    parser.c
+    misc.c
+    error.c
+    sema.c
+    builtins.c
+    codegen.c
+    preprocess.c
 )
 
 add_executable(urusc ${SOURCES} ${URUS_RUNTIME_EMBEDDED})
 
 target_include_directories(urusc PRIVATE "${CMAKE_CURRENT_BINARY_DIR}") # -I<BUILD DIRECTORIES> (example for config.h by config.h.in)
-target_include_directories(urusc PRIVATE include) # -Iinclude
 
 # -lm for non-windows
 if(UNIX AND NOT APPLE)

@@ -19,12 +19,7 @@
  * limitations under the License.
  */
 
-#include "error.h"
-#include "token.h"
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "urusc.h"
 
 static void _diag(const char *filename, Token *t)
 {

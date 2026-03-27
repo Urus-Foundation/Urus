@@ -19,15 +19,7 @@
  * limitations under the License.
  */
 
-#ifndef _WIN32
-#define _POSIX_C_SOURCE 200809L
-#endif
-
-#include "ast.h"
-#include "util.h"
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "urusc.h"
 
 AstNode *ast_new(NodeKind kind, Token tok)
 {

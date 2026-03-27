@@ -19,9 +19,7 @@
  * limitations under the License.
  */
 
-#include "util.h"
-#include <stdio.h>
-#include <stdlib.h>
+#include "urusc.h"
 
 char *read_file(const char *path, size_t *out_len)
 {

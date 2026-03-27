@@ -19,10 +19,7 @@
  * limitations under the License.
  */
 
-#include "./scope.h"
-#include "sema.h"
-#include <stdarg.h>
-#include <stdlib.h>
+#include "urusc.h"
 
 static void add_builtin(SemaScope *global, const char *name, AstType *ret,
                         int nparams, ...)
@@ -50,6 +47,41 @@ static void add_builtin(SemaScope *global, const char *name, AstType *ret,
 #define T_STR ast_type_simple(TYPE_STR)
 #define T_VOID ast_type_simple(TYPE_VOID)
 #define T_ANY NULL
+
+// extern BuiltinMap direct_maps;
+const BuiltinMap urus_builtin_direct_maps[] = {
+    {"str_len", "urus_str_len"},
+    {"str_slice", "urus_str_slice"},
+    {"str_find", "urus_str_find"},
+    {"str_contains", "urus_str_contains"},
+    {"str_upper", "urus_str_upper"},
+    {"str_lower", "urus_str_lower"},
+    {"str_trim", "urus_str_trim"},
+    {"str_replace", "urus_str_replace"},
+    {"str_starts_with", "urus_str_starts_with"},
+    {"str_ends_with", "urus_str_ends_with"},
+    {"str_split", "urus_str_split"},
+    {"char_at", "urus_char_at"},
+    {"abs", "urus_abs"},
+    {"fabs", "urus_fabs"},
+    {"sqrt", "urus_sqrt"},
+    {"pow", "urus_pow"},
+    {"min", "urus_min"},
+    {"max", "urus_max"},
+    {"fmin", "urus_fmin"},
+    {"fmax", "urus_fmax"},
+    {"input", "urus_input"},
+    {"read_file", "urus_read_file"},
+    {"write_file", "urus_write_file"},
+    {"append_file", "urus_append_file"},
+    {"exit", "urus_exit"},
+    {"assert", "urus_assert"},
+    {"len", "urus_len"},
+    {"pop", "urus_pop"},
+    {"is_ok", "urus_result_is_ok"},
+    {"is_err", "urus_result_is_err"},
+    {"unwrap_err", "urus_result_unwrap_err"},
+    {NULL, NULL}};
 
 // Register builtin definition into sema scope
 // to prevent unnecessary errors

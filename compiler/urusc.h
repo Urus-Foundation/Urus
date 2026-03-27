@@ -19,11 +19,76 @@
  * limitations under the License.
  */
 
-#ifndef URUS_AST_H
-#define URUS_AST_H
+#ifndef URUS_URUSC_H
+#define URUS_URUSC_H
 
-#include "token.h"
+#ifndef _WIN32
+#   define _POSIX_C_SOURCE 200809L 
+#endif
+
+#include "config.h"
+#include "urusctok.h"
+#include <stddef.h>
 #include <stdbool.h>
+#include <limits.h>
+#include <ctype.h>
+#include <errno.h>
+#include <stdio.h>
+#include <stdlib.h>
+#include <stdint.h>
+#include <stdbool.h>
+#include <stdarg.h>
+#include <string.h>
+
+#ifdef _WIN32
+#   define URUSC_PATHSEP '\\'
+#else
+#   define URUSC_PATHSEP '/'
+#endif
+
+#ifndef PATH_MAX
+#   ifdef MAX_PATH
+#       define PATH_MAX MAX_PATH
+#   else
+#       define PATH_MAX 4096 /* safe default value */
+#   endif
+#endif
+
+//
+// Error reporting
+//
+  
+// <filename>:ln:col: <error_type>: <msg>
+//       |
+//  <ln> | <file_content_ln>
+//       |    ^^^ (Token carret)
+void report_error(const char *filename, Token *t, const char *msg);
+void report_warn(const char *filename, Token *t, const char *msg);
+
+// filename: message
+void report(const char *filename, const char *fmt, ...);
+
+//
+// Lexer
+//
+
+typedef struct {
+    const char *source;
+    size_t length;
+    size_t pos;
+    int line;
+    int line_start;
+} Lexer;
+
+void lexer_init(Lexer *l, const char *source, size_t length);
+Token lexer_next(Lexer *l);
+
+// Tokenize entire source, returns malloc'd array, sets *count
+Token *lexer_tokenize(Lexer *l, int *count);
+
+//
+// Ast
+//
 
 // Forward declarations
 typedef struct AstNode AstNode;
@@ -439,5 +504,136 @@ void ast_print(AstNode *node, int indent);
 // Cleanup
 void ast_free(AstNode *node);
 void ast_type_free(AstType *type);
+
+//
+// Pre-process
+//
+
+// Resolves and merges all import declarations in the program AST.
+bool preprocess_imports(AstNode *program, const char *base_file);
+
+// Still an Idea: reset state between file compilations (if you ever do
+// multi-file compilation in one process lifetime) void preprocess_reset(void);
+
+//
+// Parser
+//
+
+typedef struct {
+    Token *tokens;
+    const char *filename;
+    int count;
+    int pos;
+    bool had_error;
+} Parser;
+
+void parser_init(Parser *p, Token *tokens, int count);
+AstNode *parser_parse(Parser *p);
+
+//
+// Semantic analysis
+//
+
+enum {
+    FN_SYM_TAG = 1,
+    STRUCT_SYM_TAG,
+    ENUM_SYM_TAG,
+    TYPE_SYM_TAG
+};
+
+typedef struct {
+    char *name;
+    AstType *type;
+    Token tok; // For error tracking
+    uint8_t tag;
+    bool is_mut;
+    bool is_referenced;
+    bool is_imported; // prevent unused warning on imported decl
+    bool is_builtin; // prevent unused warning on builtin function/variable
+
+    // function
+    Param *params;
+    int param_count;
+    AstType *return_type;
+
+    // struct
+    Param *fields;
+    int field_count;
+
+    // enum
+    EnumVariant *variants;
+    int variant_count;
+
+    // alias (type ID = int;);
+    AstType *alias_type;
+} SemaSymbol;
+
+typedef struct Scope {
+    SemaSymbol *syms;
+    int count, cap;
+    struct Scope *parent;
+} SemaScope;
+
+typedef struct {
+    SemaScope *current;
+    AstType *current_fn_return;
+    const char *current_fn_name; // in function '...' tracking
+    const char *filename;
+    int errors;
+    int loop_depth;
+} SemaCtx;
+
+// "str_len", "urus_str_len"
+typedef struct {
+    const char *urus;
+    const char *c;
+} BuiltinMap;
+// defined in builtins.c
+extern const BuiltinMap urus_builtin_direct_maps[];
+
+// Returns true if analysis succeeded (no errors)
+bool sema_analyze(AstNode *program, const char *filename);
+
+// Builtin registration
+// register all builtins function into semantic scope to prevent undefined error on builtin function
+void sema_register_builtins(SemaScope *global);
+
+// scope function
+SemaScope *scope_new(SemaScope *parent);
+void scope_free(SemaScope *s);
+SemaSymbol *scope_lookup_local(SemaScope *s, const char *name);
+SemaSymbol *scope_lookup(SemaScope *s, const char *name);
+SemaSymbol *scope_add(SemaScope *s, const char *name, Token tok);
+
+//
+// codegen
+//
+
+typedef struct {
+    char *data;
+    size_t len;
+    size_t cap;
+    int indent;
+    int tmp_counter;
+} CodeBuf;
+
+// Functions
+void codegen_init(CodeBuf *buf);
+void codegen_free(CodeBuf *buf);
+void codegen_generate(CodeBuf *buf, AstNode *program);
+
+//
+// MISC
+//
+
+char *read_file(const char *path, size_t *out_len);
+
+// --  Memory Management  --
+#define xfree(ptr) __xfree((void **)&(ptr))
+#define xrealloc(ptr, size) __xrealloc((void **)&(ptr), size)
+
+void *xmalloc(size_t size);
+void *__xrealloc(void **ptr, size_t size);
+void __xfree(void **ptr);
 
 #endif

@@ -46,6 +46,7 @@
     #define URUS_RAII(dtor)
     #warning "__attribute(()) is not supported in your compiler. RAII is not gonna work."
 #endif
+
 #define URUS_MOVE(type, dest, src) do { dest = src; src = NULL; } while(0) // move semantic
 typedef void (*urus_drop_fn)(void*);
 

@@ -19,13 +19,7 @@
  * limitations under the License.
  */
 
-#include "codegen.h"
-#include "config.h"
-#include "util.h"
-#include <stdarg.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "urusc.h"
 
 // runtime embbeded
 extern const unsigned char urus_runtime_header_data[];
@@ -680,44 +674,6 @@ static void gen_expr(CodeBuf *buf, AstNode *node)
             fn_name = node->as.call.callee->as.ident.name;
         }
 
-        typedef struct {
-            const char *urus;
-            const char *c;
-        } BuiltinMap;
-        static const BuiltinMap direct_maps[] = {
-            {"str_len", "urus_str_len"},
-            {"str_slice", "urus_str_slice"},
-            {"str_find", "urus_str_find"},
-            {"str_contains", "urus_str_contains"},
-            {"str_upper", "urus_str_upper"},
-            {"str_lower", "urus_str_lower"},
-            {"str_trim", "urus_str_trim"},
-            {"str_replace", "urus_str_replace"},
-            {"str_starts_with", "urus_str_starts_with"},
-            {"str_ends_with", "urus_str_ends_with"},
-            {"str_split", "urus_str_split"},
-            {"char_at", "urus_char_at"},
-            {"abs", "urus_abs"},
-            {"fabs", "urus_fabs"},
-            {"sqrt", "urus_sqrt"},
-            {"pow", "urus_pow"},
-            {"min", "urus_min"},
-            {"max", "urus_max"},
-            {"fmin", "urus_fmin"},
-            {"fmax", "urus_fmax"},
-            {"input", "urus_input"},
-            {"read_file", "urus_read_file"},
-            {"write_file", "urus_write_file"},
-            {"append_file", "urus_append_file"},
-            {"exit", "urus_exit"},
-            {"assert", "urus_assert"},
-            {"len", "urus_len"},
-            {"pop", "urus_pop"},
-            {"is_ok", "urus_result_is_ok"},
-            {"is_err", "urus_result_is_err"},
-            {"unwrap_err", "urus_result_unwrap_err"},
-            {NULL, NULL}};
-
         if (fn_name && strcmp(fn_name, "unwrap") == 0) {
             // Determine unwrap variant based on result's ok type
             const char *unwrap_fn = "urus_result_unwrap";
@@ -784,7 +740,7 @@ static void gen_expr(CodeBuf *buf, AstNode *node)
         } else {
             const char *c_name = NULL;
             if (fn_name) {
-                for (const BuiltinMap *m = direct_maps; m->urus; m++) {
+                for (const BuiltinMap *m = urus_builtin_direct_maps; m->urus; m++) {
                     if (strcmp(fn_name, m->urus) == 0) {
                         c_name = m->c;
                         break;

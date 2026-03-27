@@ -19,13 +19,7 @@
  * limitations under the License.
  */
 
-#include "lexer.h"
-#include "util.h"
-#include <ctype.h>
-#include <stdbool.h>
-#include <stdio.h>
-#include <stdlib.h>
-#include <string.h>
+#include "urusc.h"
 
 void lexer_init(Lexer *l, const char *source, size_t length)
 {
