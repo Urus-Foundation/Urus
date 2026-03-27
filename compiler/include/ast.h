@@ -15,19 +15,19 @@ typedef enum {
     TYPE_BOOL,
     TYPE_STR,
     TYPE_VOID,
-    TYPE_ARRAY,   // element type in child
-    TYPE_NAMED,   // struct or enum name
-    TYPE_RESULT,  // Result<ok_type, err_type>
-    TYPE_FN,      // fn(T1, T2) -> R
-    TYPE_TUPLE,   // (T1, T2, ...)
+    TYPE_ARRAY, // element type in child
+    TYPE_NAMED, // struct or enum name
+    TYPE_RESULT, // Result<ok_type, err_type>
+    TYPE_FN, // fn(T1, T2) -> R
+    TYPE_TUPLE, // (T1, T2, ...)
 } TypeKind;
 
 struct AstType {
     TypeKind kind;
-    char *name;         // for TYPE_NAMED
-    AstType *element;   // for TYPE_ARRAY
-    AstType *ok_type;   // for TYPE_RESULT
-    AstType *err_type;  // for TYPE_RESULT
+    char *name; // for TYPE_NAMED
+    AstType *element; // for TYPE_ARRAY
+    AstType *ok_type; // for TYPE_RESULT
+    AstType *err_type; // for TYPE_RESULT
     // for TYPE_FN
     AstType **param_types;
     int param_count;
@@ -76,14 +76,14 @@ typedef enum {
     NODE_IDENT,
     NODE_ARRAY_LIT,
     NODE_STRUCT_LIT,
-    NODE_ENUM_INIT,   // EnumName.Variant or EnumName.Variant(args)
-    NODE_OK_EXPR,     // Ok(value)
-    NODE_ERR_EXPR,    // Err(value)
-    NODE_LAMBDA,      // |params| -> type { body }
-    NODE_TUPLE_LIT,   // (expr1, expr2, ...)
-    NODE_IF_EXPR,     // if cond { expr } else { expr } (expression context)
-    NODE_RUNE_DECL,   // rune name(params) { body }
-    NODE_CONST_DECL,  // const NAME: type = value;
+    NODE_ENUM_INIT, // EnumName.Variant or EnumName.Variant(args)
+    NODE_OK_EXPR, // Ok(value)
+    NODE_ERR_EXPR, // Err(value)
+    NODE_LAMBDA, // |params| -> type { body }
+    NODE_TUPLE_LIT, // (expr1, expr2, ...)
+    NODE_IF_EXPR, // if cond { expr } else { expr } (expression context)
+    NODE_RUNE_DECL, // rune name(params) { body }
+    NODE_CONST_DECL, // const NAME: type = value;
 } NodeKind;
 
 // ---- Param ----
@@ -104,20 +104,21 @@ typedef struct {
 // ---- Enum variant ----
 typedef struct {
     char *name;
-    Param *fields;  // NULL if no data
+    Param *fields; // NULL if no data
     int field_count;
 } EnumVariant;
 
 // ---- Match arm ----
 typedef struct {
-    char *enum_name;    // e.g. "Shape"
+    char *enum_name; // e.g. "Shape"
     char *variant_name; // e.g. "Circle"
-    char **bindings;    // bound variable names, e.g. ["r"]
+    char **bindings; // bound variable names, e.g. ["r"]
     AstType **binding_types; // resolved types for each binding (filled by sema)
     int binding_count;
-    bool is_wildcard;   // true for _ arm
-    AstNode *pattern_expr; // for primitive match (int/str/bool literal), NULL for enum
-    AstNode *body;      // block
+    bool is_wildcard; // true for _ arm
+    AstNode *pattern_expr; // for primitive match (int/str/bool literal), NULL
+                           // for enum
+    AstNode *body; // block
 } MatchArm;
 
 // ---- AST Node ----
@@ -128,12 +129,16 @@ struct AstNode {
 
     union {
         // NODE_PROGRAM
-        struct { AstNode **decls; int decl_count; } program;
+        struct {
+            AstNode **decls;
+            int decl_count;
+        } program;
 
         // NODE_FN_DECL
         struct {
             char *name;
-            Param *params; int param_count;
+            Param *params;
+            int param_count;
             AstType *return_type;
             AstNode *body; // block
         } fn_decl;
@@ -141,11 +146,15 @@ struct AstNode {
         // NODE_STRUCT_DECL
         struct {
             char *name;
-            Param *fields; int field_count;
+            Param *fields;
+            int field_count;
         } struct_decl;
 
         // NODE_BLOCK
-        struct { AstNode **stmts; int stmt_count; } block;
+        struct {
+            AstNode **stmts;
+            int stmt_count;
+        } block;
 
         // NODE_LET_STMT
         struct {
@@ -162,7 +171,7 @@ struct AstNode {
         // NODE_ASSIGN_STMT
         struct {
             AstNode *target; // lvalue
-            TokenType op;    // ASSIGN, PLUS_EQ, etc.
+            TokenType op; // ASSIGN, PLUS_EQ, etc.
             AstNode *value;
         } assign_stmt;
 
@@ -181,17 +190,23 @@ struct AstNode {
         } if_expr;
 
         // NODE_WHILE_STMT
-        struct { AstNode *condition; AstNode *body; } while_stmt;
+        struct {
+            AstNode *condition;
+            AstNode *body;
+        } while_stmt;
 
         // NODE_DO_WHILE_STMT
-        struct { AstNode *body; AstNode *condition; } do_while_stmt;
+        struct {
+            AstNode *body;
+            AstNode *condition;
+        } do_while_stmt;
 
         // NODE_FOR_STMT
         struct {
             char *var_name;
-            AstNode *start;      // NULL for foreach
-            AstNode *end;        // NULL for foreach
-            AstNode *iterable;   // non-NULL for foreach
+            AstNode *start; // NULL for foreach
+            AstNode *end; // NULL for foreach
+            AstNode *iterable; // non-NULL for foreach
             bool inclusive;
             bool is_foreach;
             AstNode *body;
@@ -202,52 +217,96 @@ struct AstNode {
         } for_stmt;
 
         // NODE_RETURN_STMT
-        struct { AstNode *value; /* NULL if void */ } return_stmt;
+        struct {
+            AstNode *value; /* NULL if void */
+        } return_stmt;
 
         // NODE_DEFER_STMT
-        struct { AstNode *body; } defer_stmt;
+        struct {
+            AstNode *body;
+        } defer_stmt;
 
         // NODE_EXPR_STMT
-        struct { AstNode *expr; } expr_stmt;
+        struct {
+            AstNode *expr;
+        } expr_stmt;
 
         // NODE_EMIT_STMT
-        struct { char *content; bool is_toplevel; } emit_stmt;
+        struct {
+            char *content;
+            bool is_toplevel;
+        } emit_stmt;
 
         // NODE_BINARY
-        struct { AstNode *left; TokenType op; AstNode *right; } binary;
+        struct {
+            AstNode *left;
+            TokenType op;
+            AstNode *right;
+        } binary;
 
         // NODE_UNARY
-        struct { TokenType op; AstNode *operand; } unary;
+        struct {
+            TokenType op;
+            AstNode *operand;
+        } unary;
 
         // NODE_CALL
-        struct { AstNode *callee; AstNode **args; int arg_count; } call;
+        struct {
+            AstNode *callee;
+            AstNode **args;
+            int arg_count;
+        } call;
 
         // NODE_FIELD_ACCESS
-        struct { AstNode *object; char *field; } field_access;
+        struct {
+            AstNode *object;
+            char *field;
+        } field_access;
 
         // NODE_INDEX
-        struct { AstNode *object; AstNode *index; } index_expr;
+        struct {
+            AstNode *object;
+            AstNode *index;
+        } index_expr;
 
         // NODE_INT_LIT
-        struct { long long value; } int_lit;
+        struct {
+            long long value;
+        } int_lit;
 
         // NODE_FLOAT_LIT
-        struct { double value; } float_lit;
+        struct {
+            double value;
+        } float_lit;
 
         // NODE_STR_LIT
-        struct { char *value; } str_lit;
+        struct {
+            char *value;
+        } str_lit;
 
         // NODE_BOOL_LIT
-        struct { bool value; } bool_lit;
+        struct {
+            bool value;
+        } bool_lit;
 
         // NODE_IDENT
-        struct { char *name; } ident;
+        struct {
+            char *name;
+        } ident;
 
         // NODE_ARRAY_LIT
-        struct { AstNode **elements; int count; } array_lit;
+        struct {
+            AstNode **elements;
+            int count;
+        } array_lit;
 
         // NODE_STRUCT_LIT
-        struct { char *name; FieldInit *fields; int field_count; AstNode *spread; } struct_lit;
+        struct {
+            char *name;
+            FieldInit *fields;
+            int field_count;
+            AstNode *spread;
+        } struct_lit;
 
         // NODE_ENUM_DECL
         struct {
@@ -272,13 +331,21 @@ struct AstNode {
         } enum_init;
 
         // NODE_IMPORT
-        struct { char *path; bool is_stdlib; } import_decl;
+        struct {
+            char *path;
+            bool is_stdlib;
+        } import_decl;
 
         // NODE_OK_EXPR / NODE_ERR_EXPR
-        struct { AstNode *value; } result_expr;
+        struct {
+            AstNode *value;
+        } result_expr;
 
         // NODE_TUPLE_LIT
-        struct { AstNode **elements; int count; } tuple_lit;
+        struct {
+            AstNode **elements;
+            int count;
+        } tuple_lit;
 
         // NODE_LAMBDA
         struct {
@@ -286,10 +353,10 @@ struct AstNode {
             int param_count;
             AstType *return_type;
             AstNode *body;
-            char **captures;     // captured variable names (filled by sema)
+            char **captures; // captured variable names (filled by sema)
             AstType **capture_types; // captured variable types
             int capture_count;
-            int lambda_id;       // unique ID for codegen
+            int lambda_id; // unique ID for codegen
         } lambda;
 
         // NODE_RUNE_DECL
@@ -332,14 +399,17 @@ AstType *ast_type_simple(TypeKind kind);
 AstType *ast_type_array(AstType *element);
 AstType *ast_type_named(const char *name);
 AstType *ast_type_result(AstType *ok_type, AstType *err_type);
-AstType *ast_type_fn(AstType **param_types, int param_count, AstType *return_type);
+AstType *ast_type_fn(AstType **param_types, int param_count,
+                     AstType *return_type);
 AstType *ast_type_tuple(AstType **elems, int count);
 char *ast_strdup(const char *s, size_t len);
 
 // Type utilities
 AstType *ast_type_clone(AstType *t);
 bool ast_types_equal(AstType *a, AstType *b);
-bool ast_types_compatible(AstType *from, AstType *to); // check if its compatible (fair). Example: let x: float = 1;
+bool ast_types_compatible(
+    AstType *from,
+    AstType *to); // check if its compatible (fair). Example: let x: float = 1;
 const char *ast_type_str(AstType *t); // returns static buffer (round-robin)
 
 // Debug printing

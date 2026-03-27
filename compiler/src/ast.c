@@ -1,5 +1,5 @@
 #ifndef _WIN32
-#  define _POSIX_C_SOURCE 200809L
+#define _POSIX_C_SOURCE 200809L
 #endif
 
 #include "ast.h"
@@ -8,7 +8,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-AstNode *ast_new(NodeKind kind, Token tok) {
+AstNode *ast_new(NodeKind kind, Token tok)
+{
     AstNode *n = calloc(1, sizeof(AstNode));
     n->kind = kind;
     n->tok = tok;
@@ -16,27 +17,31 @@ AstNode *ast_new(NodeKind kind, Token tok) {
     return n;
 }
 
-AstType *ast_type_simple(TypeKind kind) {
+AstType *ast_type_simple(TypeKind kind)
+{
     AstType *t = calloc(1, sizeof(AstType));
     t->kind = kind;
     return t;
 }
 
-AstType *ast_type_array(AstType *element) {
+AstType *ast_type_array(AstType *element)
+{
     AstType *t = calloc(1, sizeof(AstType));
     t->kind = TYPE_ARRAY;
     t->element = element;
     return t;
 }
 
-AstType *ast_type_named(const char *name) {
+AstType *ast_type_named(const char *name)
+{
     AstType *t = calloc(1, sizeof(AstType));
     t->kind = TYPE_NAMED;
     t->name = strdup(name);
     return t;
 }
 
-AstType *ast_type_result(AstType *ok_type, AstType *err_type) {
+AstType *ast_type_result(AstType *ok_type, AstType *err_type)
+{
     AstType *t = calloc(1, sizeof(AstType));
     t->kind = TYPE_RESULT;
     t->ok_type = ok_type;
@@ -44,7 +49,9 @@ AstType *ast_type_result(AstType *ok_type, AstType *err_type) {
     return t;
 }
 
-AstType *ast_type_fn(AstType **param_types, int param_count, AstType *return_type) {
+AstType *ast_type_fn(AstType **param_types, int param_count,
+                     AstType *return_type)
+{
     AstType *t = calloc(1, sizeof(AstType));
     t->kind = TYPE_FN;
     t->param_types = param_types;
@@ -53,7 +60,8 @@ AstType *ast_type_fn(AstType **param_types, int param_count, AstType *return_typ
     return t;
 }
 
-AstType *ast_type_tuple(AstType **elems, int count) {
+AstType *ast_type_tuple(AstType **elems, int count)
+{
     AstType *t = calloc(1, sizeof(AstType));
     t->kind = TYPE_TUPLE;
     t->element_types = elems;
@@ -61,26 +69,34 @@ AstType *ast_type_tuple(AstType **elems, int count) {
     return t;
 }
 
-char *ast_strdup(const char *s, size_t len) {
+char *ast_strdup(const char *s, size_t len)
+{
     char *d = xmalloc(len + 1);
     memcpy(d, s, len);
     d[len] = '\0';
     return d;
 }
 
-AstType *ast_type_clone(AstType *t) {
-    if (!t) return NULL;
+AstType *ast_type_clone(AstType *t)
+{
+    if (!t)
+        return NULL;
     AstType *c = calloc(1, sizeof(AstType));
     c->kind = t->kind;
-    if (t->name) c->name = strdup(t->name);
-    if (t->element) c->element = ast_type_clone(t->element);
-    if (t->ok_type) c->ok_type = ast_type_clone(t->ok_type);
-    if (t->err_type) c->err_type = ast_type_clone(t->err_type);
+    if (t->name)
+        c->name = strdup(t->name);
+    if (t->element)
+        c->element = ast_type_clone(t->element);
+    if (t->ok_type)
+        c->ok_type = ast_type_clone(t->ok_type);
+    if (t->err_type)
+        c->err_type = ast_type_clone(t->err_type);
     if (t->kind == TYPE_FN) {
         c->param_count = t->param_count;
         c->return_type = ast_type_clone(t->return_type);
         if (t->param_count > 0) {
-            c->param_types = xmalloc(sizeof(AstType *) * (size_t)t->param_count);
+            c->param_types =
+                xmalloc(sizeof(AstType *) * (size_t)t->param_count);
             for (int i = 0; i < t->param_count; i++)
                 c->param_types[i] = ast_type_clone(t->param_types[i]);
         }
@@ -88,7 +104,8 @@ AstType *ast_type_clone(AstType *t) {
     if (t->kind == TYPE_TUPLE) {
         c->element_count = t->element_count;
         if (t->element_count > 0) {
-            c->element_types = xmalloc(sizeof(AstType *) * (size_t)t->element_count);
+            c->element_types =
+                xmalloc(sizeof(AstType *) * (size_t)t->element_count);
             for (int i = 0; i < t->element_count; i++)
                 c->element_types[i] = ast_type_clone(t->element_types[i]);
         }
@@ -96,72 +113,104 @@ AstType *ast_type_clone(AstType *t) {
     return c;
 }
 
-bool ast_types_equal(AstType *a, AstType *b) {
-    if (!a || !b) return a == b;
-    if (a->kind != b->kind) return false;
-    if (a->kind == TYPE_NAMED) return strcmp(a->name, b->name) == 0;
-    if (a->kind == TYPE_ARRAY) return ast_types_equal(a->element, b->element);
-    if (a->kind == TYPE_RESULT) return ast_types_equal(a->ok_type, b->ok_type) && ast_types_equal(a->err_type, b->err_type);
+bool ast_types_equal(AstType *a, AstType *b)
+{
+    if (!a || !b)
+        return a == b;
+    if (a->kind != b->kind)
+        return false;
+    if (a->kind == TYPE_NAMED)
+        return strcmp(a->name, b->name) == 0;
+    if (a->kind == TYPE_ARRAY)
+        return ast_types_equal(a->element, b->element);
+    if (a->kind == TYPE_RESULT)
+        return ast_types_equal(a->ok_type, b->ok_type) &&
+               ast_types_equal(a->err_type, b->err_type);
     if (a->kind == TYPE_FN) {
-        if (a->param_count != b->param_count) return false;
-        if (!ast_types_equal(a->return_type, b->return_type)) return false;
+        if (a->param_count != b->param_count)
+            return false;
+        if (!ast_types_equal(a->return_type, b->return_type))
+            return false;
         for (int i = 0; i < a->param_count; i++)
-            if (!ast_types_equal(a->param_types[i], b->param_types[i])) return false;
+            if (!ast_types_equal(a->param_types[i], b->param_types[i]))
+                return false;
         return true;
     }
     if (a->kind == TYPE_TUPLE) {
-        if (a->element_count != b->element_count) return false;
+        if (a->element_count != b->element_count)
+            return false;
         for (int i = 0; i < a->element_count; i++)
-            if (!ast_types_equal(a->element_types[i], b->element_types[i])) return false;
+            if (!ast_types_equal(a->element_types[i], b->element_types[i]))
+                return false;
         return true;
     }
     return true;
 }
 
-bool ast_types_compatible(AstType *from, AstType *to) {
-    if (!from || !to) return false;
-    if (ast_types_equal(from, to)) return true;
-    if (from->kind == TYPE_INT && to->kind == TYPE_FLOAT) return true;
+bool ast_types_compatible(AstType *from, AstType *to)
+{
+    if (!from || !to)
+        return false;
+    if (ast_types_equal(from, to))
+        return true;
+    if (from->kind == TYPE_INT && to->kind == TYPE_FLOAT)
+        return true;
     if (from->kind == TYPE_ARRAY && to->kind == TYPE_ARRAY) {
-        if (from->element->kind == TYPE_INT && to->element->kind == TYPE_FLOAT) return true;
+        if (from->element->kind == TYPE_INT && to->element->kind == TYPE_FLOAT)
+            return true;
     }
     return false;
 }
 
 // Round-robin static buffers to avoid clobber in printf with multiple calls
-const char *ast_type_str(AstType *t) {
+const char *ast_type_str(AstType *t)
+{
     static char bufs[4][256];
     static int idx = 0;
     char *buf = bufs[idx++ % 4];
 
-    if (!t) { return "void"; }
+    if (!t) {
+        return "void";
+    }
     switch (t->kind) {
-    case TYPE_INT:   return "int";
-    case TYPE_FLOAT: return "float";
-    case TYPE_BOOL:  return "bool";
-    case TYPE_STR:   return "str";
-    case TYPE_VOID:  return "void";
-    case TYPE_NAMED: return t->name;
+    case TYPE_INT:
+        return "int";
+    case TYPE_FLOAT:
+        return "float";
+    case TYPE_BOOL:
+        return "bool";
+    case TYPE_STR:
+        return "str";
+    case TYPE_VOID:
+        return "void";
+    case TYPE_NAMED:
+        return t->name;
     case TYPE_ARRAY:
         snprintf(buf, 256, "[%s]", ast_type_str(t->element));
         return buf;
     case TYPE_RESULT:
-        snprintf(buf, 256, "Result<%s, %s>", ast_type_str(t->ok_type), ast_type_str(t->err_type));
+        snprintf(buf, 256, "Result<%s, %s>", ast_type_str(t->ok_type),
+                 ast_type_str(t->err_type));
         return buf;
     case TYPE_FN: {
         int pos = snprintf(buf, 256, "fn(");
         for (int i = 0; i < t->param_count; i++) {
-            if (i > 0) pos += snprintf(buf + pos, 256 - (size_t)pos, ", ");
-            pos += snprintf(buf + pos, 256 - (size_t)pos, "%s", ast_type_str(t->param_types[i]));
+            if (i > 0)
+                pos += snprintf(buf + pos, 256 - (size_t)pos, ", ");
+            pos += snprintf(buf + pos, 256 - (size_t)pos, "%s",
+                            ast_type_str(t->param_types[i]));
         }
-        snprintf(buf + pos, 256 - (size_t)pos, ") -> %s", ast_type_str(t->return_type));
+        snprintf(buf + pos, 256 - (size_t)pos, ") -> %s",
+                 ast_type_str(t->return_type));
         return buf;
     }
     case TYPE_TUPLE: {
         int pos = snprintf(buf, 256, "(");
         for (int i = 0; i < t->element_count; i++) {
-            if (i > 0) pos += snprintf(buf + pos, 256 - (size_t)pos, ", ");
-            pos += snprintf(buf + pos, 256 - (size_t)pos, "%s", ast_type_str(t->element_types[i]));
+            if (i > 0)
+                pos += snprintf(buf + pos, 256 - (size_t)pos, ", ");
+            pos += snprintf(buf + pos, 256 - (size_t)pos, "%s",
+                            ast_type_str(t->element_types[i]));
         }
         snprintf(buf + pos, 256 - (size_t)pos, ")");
         return buf;
@@ -170,25 +219,54 @@ const char *ast_type_str(AstType *t) {
     return "?";
 }
 
-static void indent(int level) {
-    for (int i = 0; i < level; i++) printf("  ");
+static void indent(int level)
+{
+    for (int i = 0; i < level; i++)
+        printf("  ");
 }
 
-static void print_type(AstType *t) {
-    if (!t) { printf("(none)"); return; }
+static void print_type(AstType *t)
+{
+    if (!t) {
+        printf("(none)");
+        return;
+    }
     switch (t->kind) {
-    case TYPE_INT:    printf("int"); break;
-    case TYPE_FLOAT:  printf("float"); break;
-    case TYPE_BOOL:   printf("bool"); break;
-    case TYPE_STR:    printf("str"); break;
-    case TYPE_VOID:   printf("void"); break;
-    case TYPE_ARRAY:  printf("["); print_type(t->element); printf("]"); break;
-    case TYPE_NAMED:  printf("%s", t->name); break;
-    case TYPE_RESULT: printf("Result<"); print_type(t->ok_type); printf(", "); print_type(t->err_type); printf(">"); break;
+    case TYPE_INT:
+        printf("int");
+        break;
+    case TYPE_FLOAT:
+        printf("float");
+        break;
+    case TYPE_BOOL:
+        printf("bool");
+        break;
+    case TYPE_STR:
+        printf("str");
+        break;
+    case TYPE_VOID:
+        printf("void");
+        break;
+    case TYPE_ARRAY:
+        printf("[");
+        print_type(t->element);
+        printf("]");
+        break;
+    case TYPE_NAMED:
+        printf("%s", t->name);
+        break;
+    case TYPE_RESULT:
+        printf("Result<");
+        print_type(t->ok_type);
+        printf(", ");
+        print_type(t->err_type);
+        printf(">");
+        break;
     case TYPE_FN:
         printf("fn(");
         for (int i = 0; i < t->param_count; i++) {
-            if (i > 0) printf(", ");
+            if (i > 0)
+                printf(", ");
             print_type(t->param_types[i]);
         }
         printf(") -> ");
@@ -197,7 +275,8 @@ static void print_type(AstType *t) {
     case TYPE_TUPLE:
         printf("(");
         for (int i = 0; i < t->element_count; i++) {
-            if (i > 0) printf(", ");
+            if (i > 0)
+                printf(", ");
             print_type(t->element_types[i]);
         }
         printf(")");
@@ -205,8 +284,10 @@ static void print_type(AstType *t) {
     }
 }
 
-void ast_print(AstNode *node, int ind) {
-    if (!node) return;
+void ast_print(AstNode *node, int ind)
+{
+    if (!node)
+        return;
     indent(ind);
 
     switch (node->kind) {
@@ -221,17 +302,22 @@ void ast_print(AstNode *node, int ind) {
         print_type(node->as.fn_decl.return_type);
         printf(" (%d params)\n", node->as.fn_decl.param_count);
         for (int i = 0; i < node->as.fn_decl.param_count; i++) {
-            indent(ind + 1); printf("param '%s': ", node->as.fn_decl.params[i].name);
-            print_type(node->as.fn_decl.params[i].type); printf("\n");
+            indent(ind + 1);
+            printf("param '%s': ", node->as.fn_decl.params[i].name);
+            print_type(node->as.fn_decl.params[i].type);
+            printf("\n");
         }
         ast_print(node->as.fn_decl.body, ind + 1);
         break;
 
     case NODE_STRUCT_DECL:
-        printf("StructDecl '%s' (%d fields)\n", node->as.struct_decl.name, node->as.struct_decl.field_count);
+        printf("StructDecl '%s' (%d fields)\n", node->as.struct_decl.name,
+               node->as.struct_decl.field_count);
         for (int i = 0; i < node->as.struct_decl.field_count; i++) {
-            indent(ind + 1); printf("field '%s': ", node->as.struct_decl.fields[i].name);
-            print_type(node->as.struct_decl.fields[i].type); printf("\n");
+            indent(ind + 1);
+            printf("field '%s': ", node->as.struct_decl.fields[i].name);
+            print_type(node->as.struct_decl.fields[i].type);
+            printf("\n");
         }
         break;
 
@@ -245,14 +331,17 @@ void ast_print(AstNode *node, int ind) {
         if (node->as.let_stmt.is_destructure) {
             printf("Let%s (", node->as.let_stmt.is_mut ? " mut" : "");
             for (int i = 0; i < node->as.let_stmt.name_count; i++) {
-                if (i > 0) printf(", ");
+                if (i > 0)
+                    printf(", ");
                 printf("%s", node->as.let_stmt.names[i]);
             }
             printf("): ");
         } else {
-            printf("Let%s '%s': ", node->as.let_stmt.is_mut ? " mut" : "", node->as.let_stmt.name);
+            printf("Let%s '%s': ", node->as.let_stmt.is_mut ? " mut" : "",
+                   node->as.let_stmt.name);
         }
-        print_type(node->as.let_stmt.type); printf("\n");
+        print_type(node->as.let_stmt.type);
+        printf("\n");
         ast_print(node->as.let_stmt.init, ind + 1);
         break;
 
@@ -264,12 +353,15 @@ void ast_print(AstNode *node, int ind) {
 
     case NODE_IF_STMT:
         printf("If\n");
-        indent(ind + 1); printf("condition:\n");
+        indent(ind + 1);
+        printf("condition:\n");
         ast_print(node->as.if_stmt.condition, ind + 2);
-        indent(ind + 1); printf("then:\n");
+        indent(ind + 1);
+        printf("then:\n");
         ast_print(node->as.if_stmt.then_block, ind + 2);
         if (node->as.if_stmt.else_branch) {
-            indent(ind + 1); printf("else:\n");
+            indent(ind + 1);
+            printf("else:\n");
             ast_print(node->as.if_stmt.else_branch, ind + 2);
         }
         break;
@@ -289,14 +381,17 @@ void ast_print(AstNode *node, int ind) {
     case NODE_FOR_STMT:
         if (node->as.for_stmt.is_foreach) {
             printf("ForEach '%s'\n", node->as.for_stmt.var_name);
-            indent(ind + 1); printf("iterable:\n");
+            indent(ind + 1);
+            printf("iterable:\n");
             ast_print(node->as.for_stmt.iterable, ind + 2);
         } else {
             printf("For '%s' (%s)\n", node->as.for_stmt.var_name,
                    node->as.for_stmt.inclusive ? "inclusive" : "exclusive");
-            indent(ind + 1); printf("start:\n");
+            indent(ind + 1);
+            printf("start:\n");
             ast_print(node->as.for_stmt.start, ind + 2);
-            indent(ind + 1); printf("end:\n");
+            indent(ind + 1);
+            printf("end:\n");
             ast_print(node->as.for_stmt.end, ind + 2);
         }
         ast_print(node->as.for_stmt.body, ind + 1);
@@ -308,8 +403,12 @@ void ast_print(AstNode *node, int ind) {
             ast_print(node->as.return_stmt.value, ind + 1);
         break;
 
-    case NODE_BREAK_STMT:    printf("Break\n"); break;
-    case NODE_CONTINUE_STMT: printf("Continue\n"); break;
+    case NODE_BREAK_STMT:
+        printf("Break\n");
+        break;
+    case NODE_CONTINUE_STMT:
+        printf("Continue\n");
+        break;
 
     case NODE_EXPR_STMT:
         printf("ExprStmt\n");
@@ -317,7 +416,8 @@ void ast_print(AstNode *node, int ind) {
         break;
 
     case NODE_EMIT_STMT:
-        printf("EmitStmt(toplevel=%s)\n", node->as.emit_stmt.is_toplevel ? "true" : "false");
+        printf("EmitStmt(toplevel=%s)\n",
+               node->as.emit_stmt.is_toplevel ? "true" : "false");
         break;
 
     case NODE_BINARY:
@@ -349,11 +449,21 @@ void ast_print(AstNode *node, int ind) {
         ast_print(node->as.index_expr.index, ind + 1);
         break;
 
-    case NODE_INT_LIT:   printf("IntLit %lld\n", node->as.int_lit.value); break;
-    case NODE_FLOAT_LIT: printf("FloatLit %f\n", node->as.float_lit.value); break;
-    case NODE_STR_LIT:   printf("StrLit \"%s\"\n", node->as.str_lit.value); break;
-    case NODE_BOOL_LIT:  printf("BoolLit %s\n", node->as.bool_lit.value ? "true" : "false"); break;
-    case NODE_IDENT:     printf("Ident '%s'\n", node->as.ident.name); break;
+    case NODE_INT_LIT:
+        printf("IntLit %lld\n", node->as.int_lit.value);
+        break;
+    case NODE_FLOAT_LIT:
+        printf("FloatLit %f\n", node->as.float_lit.value);
+        break;
+    case NODE_STR_LIT:
+        printf("StrLit \"%s\"\n", node->as.str_lit.value);
+        break;
+    case NODE_BOOL_LIT:
+        printf("BoolLit %s\n", node->as.bool_lit.value ? "true" : "false");
+        break;
+    case NODE_IDENT:
+        printf("Ident '%s'\n", node->as.ident.name);
+        break;
 
     case NODE_ARRAY_LIT:
         printf("ArrayLit (%d elements)\n", node->as.array_lit.count);
@@ -362,27 +472,33 @@ void ast_print(AstNode *node, int ind) {
         break;
 
     case NODE_STRUCT_LIT:
-        printf("StructLit '%s' (%d fields%s)\n", node->as.struct_lit.name, node->as.struct_lit.field_count,
+        printf("StructLit '%s' (%d fields%s)\n", node->as.struct_lit.name,
+               node->as.struct_lit.field_count,
                node->as.struct_lit.spread ? " +spread" : "");
         for (int i = 0; i < node->as.struct_lit.field_count; i++) {
-            indent(ind + 1); printf(".%s =\n", node->as.struct_lit.fields[i].name);
+            indent(ind + 1);
+            printf(".%s =\n", node->as.struct_lit.fields[i].name);
             ast_print(node->as.struct_lit.fields[i].value, ind + 2);
         }
         if (node->as.struct_lit.spread) {
-            indent(ind + 1); printf("..spread =\n");
+            indent(ind + 1);
+            printf("..spread =\n");
             ast_print(node->as.struct_lit.spread, ind + 2);
         }
         break;
 
     case NODE_ENUM_DECL:
-        printf("EnumDecl '%s' (%d variants)\n", node->as.enum_decl.name, node->as.enum_decl.variant_count);
+        printf("EnumDecl '%s' (%d variants)\n", node->as.enum_decl.name,
+               node->as.enum_decl.variant_count);
         for (int i = 0; i < node->as.enum_decl.variant_count; i++) {
             EnumVariant *v = &node->as.enum_decl.variants[i];
-            indent(ind + 1); printf("variant '%s'", v->name);
+            indent(ind + 1);
+            printf("variant '%s'", v->name);
             if (v->field_count > 0) {
                 printf("(");
                 for (int j = 0; j < v->field_count; j++) {
-                    if (j > 0) printf(", ");
+                    if (j > 0)
+                        printf(", ");
                     printf("%s: ", v->fields[j].name);
                     print_type(v->fields[j].type);
                 }
@@ -394,7 +510,8 @@ void ast_print(AstNode *node, int ind) {
 
     case NODE_MATCH:
         printf("Match\n");
-        indent(ind + 1); printf("target:\n");
+        indent(ind + 1);
+        printf("target:\n");
         ast_print(node->as.match_stmt.target, ind + 2);
         for (int i = 0; i < node->as.match_stmt.arm_count; i++) {
             MatchArm *a = &node->as.match_stmt.arms[i];
@@ -408,7 +525,8 @@ void ast_print(AstNode *node, int ind) {
                 if (a->binding_count > 0) {
                     printf("(");
                     for (int j = 0; j < a->binding_count; j++) {
-                        if (j > 0) printf(", ");
+                        if (j > 0)
+                            printf(", ");
                         printf("%s", a->bindings[j]);
                     }
                     printf(")");
@@ -479,8 +597,10 @@ void ast_print(AstNode *node, int ind) {
     }
 }
 
-void ast_type_free(AstType *type) {
-    if (!type) return;
+void ast_type_free(AstType *type)
+{
+    if (!type)
+        return;
     xfree(type->name);
     ast_type_free(type->element);
     ast_type_free(type->ok_type);
@@ -499,8 +619,10 @@ void ast_type_free(AstType *type) {
     xfree(type);
 }
 
-void ast_free(AstNode *node) {
-    if (!node || --node->ref_count > 0) return;
+void ast_free(AstNode *node)
+{
+    if (!node || --node->ref_count > 0)
+        return;
     ast_type_free(node->resolved_type);
     switch (node->kind) {
     case NODE_PROGRAM:
@@ -600,8 +722,12 @@ void ast_free(AstNode *node) {
         ast_free(node->as.index_expr.object);
         ast_free(node->as.index_expr.index);
         break;
-    case NODE_STR_LIT: xfree(node->as.str_lit.value); break;
-    case NODE_IDENT: xfree(node->as.ident.name); break;
+    case NODE_STR_LIT:
+        xfree(node->as.str_lit.value);
+        break;
+    case NODE_IDENT:
+        xfree(node->as.ident.name);
+        break;
     case NODE_ARRAY_LIT:
         for (int i = 0; i < node->as.array_lit.count; i++)
             ast_free(node->as.array_lit.elements[i]);
@@ -620,7 +746,8 @@ void ast_free(AstNode *node) {
         xfree(node->as.enum_decl.name);
         for (int i = 0; i < node->as.enum_decl.variant_count; i++) {
             xfree(node->as.enum_decl.variants[i].name);
-            for (int j = 0; j < node->as.enum_decl.variants[i].field_count; j++) {
+            for (int j = 0; j < node->as.enum_decl.variants[i].field_count;
+                 j++) {
                 xfree(node->as.enum_decl.variants[i].fields[j].name);
                 ast_type_free(node->as.enum_decl.variants[i].fields[j].type);
             }
@@ -637,7 +764,8 @@ void ast_free(AstNode *node) {
                 xfree(node->as.match_stmt.arms[i].bindings[j]);
             xfree(node->as.match_stmt.arms[i].bindings);
             if (node->as.match_stmt.arms[i].binding_types) {
-                for (int j = 0; j < node->as.match_stmt.arms[i].binding_count; j++)
+                for (int j = 0; j < node->as.match_stmt.arms[i].binding_count;
+                     j++)
                     ast_type_free(node->as.match_stmt.arms[i].binding_types[j]);
                 xfree(node->as.match_stmt.arms[i].binding_types);
             }

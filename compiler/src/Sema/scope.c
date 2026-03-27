@@ -3,7 +3,8 @@
 #include <stdlib.h>
 #include <string.h>
 
-SemaScope *scope_new(SemaScope *parent) {
+SemaScope *scope_new(SemaScope *parent)
+{
     SemaScope *s = calloc(1, sizeof(SemaScope));
     s->parent = parent;
     s->cap = 8;
@@ -11,27 +12,33 @@ SemaScope *scope_new(SemaScope *parent) {
     return s;
 }
 
-void scope_free(SemaScope *s) {
+void scope_free(SemaScope *s)
+{
     xfree(s->syms);
     xfree(s);
 }
 
-SemaSymbol *scope_lookup_local(SemaScope *s, const char *name) {
+SemaSymbol *scope_lookup_local(SemaScope *s, const char *name)
+{
     for (int i = 0; i < s->count; i++) {
-        if (strcmp(s->syms[i].name, name) == 0) return &s->syms[i];
+        if (strcmp(s->syms[i].name, name) == 0)
+            return &s->syms[i];
     }
     return NULL;
 }
 
-SemaSymbol *scope_lookup(SemaScope *s, const char *name) {
+SemaSymbol *scope_lookup(SemaScope *s, const char *name)
+{
     for (SemaScope *cur = s; cur; cur = cur->parent) {
         SemaSymbol *sym = scope_lookup_local(cur, name);
-        if (sym) return sym;
+        if (sym)
+            return sym;
     }
     return NULL;
 }
 
-SemaSymbol *scope_add(SemaScope *s, const char *name, Token tok) {
+SemaSymbol *scope_add(SemaScope *s, const char *name, Token tok)
+{
     if (s->count >= s->cap) {
         s->cap *= 2;
         s->syms = xrealloc(s->syms, sizeof(SemaSymbol) * (size_t)s->cap);

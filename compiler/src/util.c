@@ -2,7 +2,8 @@
 #include <stdio.h>
 #include <stdlib.h>
 
-char *read_file(const char *path, size_t *out_len) {
+char *read_file(const char *path, size_t *out_len)
+{
     FILE *f = fopen(path, "rb");
     if (!f) {
         fprintf(stderr, "Error: cannot open file '%s'\n", path);
@@ -21,12 +22,14 @@ char *read_file(const char *path, size_t *out_len) {
     buf[len] = '\0';
     fclose(f);
 
-    if (out_len) *out_len = len;
+    if (out_len)
+        *out_len = len;
     return buf;
 }
 
 // --  Memory Management  --
-void *xmalloc(size_t size) {
+void *xmalloc(size_t size)
+{
     void *ptr = malloc(size);
     if (!ptr) {
         fprintf(stderr, "Memory allocation failed; out of memory.\n");
@@ -35,7 +38,8 @@ void *xmalloc(size_t size) {
     return ptr;
 }
 
-void *__xrealloc(void **ptr, size_t size) {
+void *__xrealloc(void **ptr, size_t size)
+{
     void *new_ptr = realloc(*ptr, size);
     if (!new_ptr) {
         fprintf(stderr, "Memory re-allocation failed; out of memory.\n");
@@ -44,7 +48,8 @@ void *__xrealloc(void **ptr, size_t size) {
     return new_ptr;
 }
 
-void __xfree(void **ptr) {
+void __xfree(void **ptr)
+{
     if (ptr != NULL && *ptr != NULL) {
         free(*ptr);
         *ptr = NULL;

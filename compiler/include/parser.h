@@ -2,8 +2,8 @@
 #define URUS_PARSER_H
 
 #include "ast.h"
-#include "token.h"
 #include "lexer.h"
+#include "token.h"
 
 typedef struct {
     Token *tokens;

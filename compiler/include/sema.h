@@ -2,8 +2,8 @@
 #define URUS_SEMA_H
 
 #include "ast.h"
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 enum {
     FN_SYM_TAG = 1,
@@ -21,7 +21,7 @@ typedef struct {
     bool is_referenced;
     bool is_imported; // prevent unused warning on imported decl
     bool is_builtin; // prevent unused warning on builtin function/variable
- 
+
     // function
     Param *params;
     int param_count;

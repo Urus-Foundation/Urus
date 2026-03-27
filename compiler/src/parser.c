@@ -1,77 +1,97 @@
 #ifndef _WIN32
-#  define _POSIX_C_SOURCE 200809L
+#define _POSIX_C_SOURCE 200809L
 #endif
 
 #include "parser.h"
-#include "util.h"
 #include "error.h"
+#include "util.h"
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <errno.h>
 
 // ---- Helpers ----
 
-void parser_init(Parser *p, Token *tokens, int count) {
+void parser_init(Parser *p, Token *tokens, int count)
+{
     p->tokens = tokens;
     p->count = count;
     p->pos = 0;
     p->had_error = false;
 }
 
-static Token current(Parser *p) {
+static Token current(Parser *p)
+{
     return p->tokens[p->pos];
 }
 
-static Token previous(Parser *p) {
+static Token previous(Parser *p)
+{
     return p->tokens[p->pos - 1];
 }
 
-static bool check(Parser *p, TokenType type) {
+static bool check(Parser *p, TokenType type)
+{
     return current(p).type == type;
 }
 
-static TokenType peek_next_type(Parser *p) {
-    if (p->tokens[p->pos].type == TOK_EOF) return TOK_EOF;
+static TokenType peek_next_type(Parser *p)
+{
+    if (p->tokens[p->pos].type == TOK_EOF)
+        return TOK_EOF;
     return p->tokens[p->pos + 1].type;
 }
 
-static bool at_end(Parser *p) {
+static bool at_end(Parser *p)
+{
     return current(p).type == TOK_EOF;
 }
 
-static Token advance_tok(Parser *p) {
+static Token advance_tok(Parser *p)
+{
     Token t = current(p);
-    if (!at_end(p)) p->pos++;
+    if (!at_end(p))
+        p->pos++;
     return t;
 }
 
-static void error_at(Parser *p, Token t, const char *msg) {
-    if (p->had_error) return;
+static void error_at(Parser *p, Token t, const char *msg)
+{
+    if (p->had_error)
+        return;
     p->had_error = true;
     report_error(p->filename, &t, msg);
 }
 
-static void warn_at(Parser *p, Token t, const char *msg) {
+static void warn_at(Parser *p, Token t, const char *msg)
+{
     report_warn(p->filename, &t, msg);
 }
 
-static Token expect(Parser *p, TokenType type, const char *msg) {
-    if (check(p, type)) return advance_tok(p);
+static Token expect(Parser *p, TokenType type, const char *msg)
+{
+    if (check(p, type))
+        return advance_tok(p);
     error_at(p, current(p), msg);
     return current(p);
 }
 
-static bool match(Parser *p, TokenType type) {
-    if (check(p, type)) { advance_tok(p); return true; }
+static bool match(Parser *p, TokenType type)
+{
+    if (check(p, type)) {
+        advance_tok(p);
+        return true;
+    }
     return false;
 }
 
-static char *tok_str(Token t) {
+static char *tok_str(Token t)
+{
     return ast_strdup(t.start, t.length);
 }
 
-static char *tok_str_value(Token t) {
+static char *tok_str_value(Token t)
+{
     if (t.length >= 6 && strncmp(t.start, "\"\"\"", 3) == 0) {
         return ast_strdup(t.start + 3, t.length - 6);
     }
@@ -79,11 +99,13 @@ static char *tok_str_value(Token t) {
 }
 
 // Strip underscores from numeric literal for strtoll/strtod
-static char *tok_num_str(Token t) {
+static char *tok_num_str(Token t)
+{
     char *buf = xmalloc(t.length + 1);
     size_t j = 0;
     for (size_t i = 0; i < t.length; i++) {
-        if (t.start[i] != '_') buf[j++] = t.start[i];
+        if (t.start[i] != '_')
+            buf[j++] = t.start[i];
     }
     buf[j] = '\0';
     return buf;
@@ -108,21 +130,29 @@ typedef struct {
 static RuneDef rune_defs[MAX_RUNES];
 static int rune_count = 0;
 
-static RuneDef *find_rune(const char *name) {
+static RuneDef *find_rune(const char *name)
+{
     for (int i = 0; i < rune_count; i++) {
-        if (strcmp(rune_defs[i].name, name) == 0) return &rune_defs[i];
+        if (strcmp(rune_defs[i].name, name) == 0)
+            return &rune_defs[i];
     }
     return NULL;
 }
 
 // ---- Type parsing ----
 
-static AstType *parse_type(Parser *p) {
-    if (match(p, TOK_INT))   return ast_type_simple(TYPE_INT);
-    if (match(p, TOK_FLOAT)) return ast_type_simple(TYPE_FLOAT);
-    if (match(p, TOK_BOOL))  return ast_type_simple(TYPE_BOOL);
-    if (match(p, TOK_STR))   return ast_type_simple(TYPE_STR);
-    if (match(p, TOK_VOID))  return ast_type_simple(TYPE_VOID);
+static AstType *parse_type(Parser *p)
+{
+    if (match(p, TOK_INT))
+        return ast_type_simple(TYPE_INT);
+    if (match(p, TOK_FLOAT))
+        return ast_type_simple(TYPE_FLOAT);
+    if (match(p, TOK_BOOL))
+        return ast_type_simple(TYPE_BOOL);
+    if (match(p, TOK_STR))
+        return ast_type_simple(TYPE_STR);
+    if (match(p, TOK_VOID))
+        return ast_type_simple(TYPE_VOID);
     if (match(p, TOK_LBRACKET)) {
         AstType *elem = parse_type(p);
         expect(p, TOK_RBRACKET, "expected ']' after array type");
@@ -165,7 +195,8 @@ static AstType *parse_type(Parser *p) {
 
 // ---- F-string parsing ----
 // Desugar f"text {expr} text" into chain of to_str() + concat
-static AstNode *parse_fstring(Parser *p, Token t) {
+static AstNode *parse_fstring(Parser *p, Token t)
+{
     (void)p;
     // Token content is f"...", strip f" and "
     const char *raw = t.start + 2; // skip f"
@@ -180,10 +211,18 @@ static AstNode *parse_fstring(Parser *p, Token t) {
             // Collect literal text including escaped braces
             size_t start = i;
             while (i < raw_len) {
-                if (raw[i] == '{' && i + 1 < raw_len && raw[i + 1] == '{') { i += 2; continue; }
-                if (raw[i] == '}' && i + 1 < raw_len && raw[i + 1] == '}') { i += 2; continue; }
-                if (raw[i] == '{' || raw[i] == '}') break;
-                if (raw[i] == '\\' && i + 1 < raw_len) i++;
+                if (raw[i] == '{' && i + 1 < raw_len && raw[i + 1] == '{') {
+                    i += 2;
+                    continue;
+                }
+                if (raw[i] == '}' && i + 1 < raw_len && raw[i + 1] == '}') {
+                    i += 2;
+                    continue;
+                }
+                if (raw[i] == '{' || raw[i] == '}')
+                    break;
+                if (raw[i] == '\\' && i + 1 < raw_len)
+                    i++;
                 i++;
             }
             // Build the literal with escaped braces resolved
@@ -191,15 +230,21 @@ static AstNode *parse_fstring(Parser *p, Token t) {
             char *buf = xmalloc(seg_len + 1);
             size_t j = 0;
             for (size_t k = start; k < i; k++) {
-                if (raw[k] == '{' && k + 1 < i && raw[k + 1] == '{') { buf[j++] = '{'; k++; }
-                else if (raw[k] == '}' && k + 1 < i && raw[k + 1] == '}') { buf[j++] = '}'; k++; }
-                else buf[j++] = raw[k];
+                if (raw[k] == '{' && k + 1 < i && raw[k + 1] == '{') {
+                    buf[j++] = '{';
+                    k++;
+                } else if (raw[k] == '}' && k + 1 < i && raw[k + 1] == '}') {
+                    buf[j++] = '}';
+                    k++;
+                } else
+                    buf[j++] = raw[k];
             }
             buf[j] = '\0';
             AstNode *lit = ast_new(NODE_STR_LIT, t);
             lit->as.str_lit.value = buf;
-            if (!result) { result = lit; }
-            else {
+            if (!result) {
+                result = lit;
+            } else {
                 AstNode *bin = ast_new(NODE_BINARY, t);
                 bin->as.binary.left = result;
                 bin->as.binary.op = TOK_PLUS;
@@ -214,12 +259,16 @@ static AstNode *parse_fstring(Parser *p, Token t) {
             size_t start = i;
             int depth = 1;
             while (i < raw_len && depth > 0) {
-                if (raw[i] == '{') depth++;
-                else if (raw[i] == '}') depth--;
-                if (depth > 0) i++;
+                if (raw[i] == '{')
+                    depth++;
+                else if (raw[i] == '}')
+                    depth--;
+                if (depth > 0)
+                    i++;
             }
             size_t expr_len = i - start;
-            if (i < raw_len) i++; // skip }
+            if (i < raw_len)
+                i++; // skip }
 
             // Parse the expression substring
             // Create a mini-lexer for the expression
@@ -257,7 +306,8 @@ static AstNode *parse_fstring(Parser *p, Token t) {
             // Collect literal text until { or end
             size_t start = i;
             while (i < raw_len && raw[i] != '{') {
-                if (raw[i] == '\\' && i + 1 < raw_len) i++; // skip escape
+                if (raw[i] == '\\' && i + 1 < raw_len)
+                    i++; // skip escape
                 i++;
             }
             if (i > start) {
@@ -287,7 +337,8 @@ static AstNode *parse_fstring(Parser *p, Token t) {
 
 // ---- Expression parsing (precedence climbing) ----
 
-static AstNode *parse_primary(Parser *p) {
+static AstNode *parse_primary(Parser *p)
+{
     Token t = current(p);
 
     if (match(p, TOK_INT_LIT)) {
@@ -297,9 +348,16 @@ static AstNode *parse_primary(Parser *p) {
         // Detect base from prefix
         int base = 10;
         char *num = s;
-        if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) { base = 16; num = s + 2; }
-        else if (s[0] == '0' && (s[1] == 'b' || s[1] == 'B')) { base = 2; num = s + 2; }
-        else if (s[0] == '0' && (s[1] == 'o' || s[1] == 'O')) { base = 8; num = s + 2; }
+        if (s[0] == '0' && (s[1] == 'x' || s[1] == 'X')) {
+            base = 16;
+            num = s + 2;
+        } else if (s[0] == '0' && (s[1] == 'b' || s[1] == 'B')) {
+            base = 2;
+            num = s + 2;
+        } else if (s[0] == '0' && (s[1] == 'o' || s[1] == 'O')) {
+            base = 8;
+            num = s + 2;
+        }
         n->as.int_lit.value = strtoll(num, NULL, base);
         if (errno == ERANGE) {
             warn_at(p, t, "integer literal out of range");
@@ -365,7 +423,8 @@ static AstNode *parse_primary(Parser *p) {
                     // Collect argument token spans
                     // Each argument is a span of tokens delimited by , or )
                     int arg_cap = 8;
-                    Token **arg_tokens = xmalloc(sizeof(Token *) * (size_t)arg_cap);
+                    Token **arg_tokens =
+                        xmalloc(sizeof(Token *) * (size_t)arg_cap);
                     int *arg_lens = xmalloc(sizeof(int) * (size_t)arg_cap);
                     int arg_count = 0;
 
@@ -373,42 +432,56 @@ static AstNode *parse_primary(Parser *p) {
                         while (1) {
                             if (arg_count >= arg_cap) {
                                 arg_cap *= 2;
-                                arg_tokens = xrealloc(arg_tokens, sizeof(Token *) * (size_t)arg_cap);
-                                arg_lens = xrealloc(arg_lens, sizeof(int) * (size_t)arg_cap);
+                                arg_tokens =
+                                    xrealloc(arg_tokens,
+                                             sizeof(Token *) * (size_t)arg_cap);
+                                arg_lens = xrealloc(
+                                    arg_lens, sizeof(int) * (size_t)arg_cap);
                             }
                             int start = p->pos;
                             int depth2 = 0;
                             // Scan until , or ) at depth 0
                             while (!at_end(p)) {
                                 TokenType tt = current(p).type;
-                                if (tt == TOK_LPAREN || tt == TOK_LBRACKET || tt == TOK_LBRACE) depth2++;
-                                else if (tt == TOK_RPAREN || tt == TOK_RBRACKET || tt == TOK_RBRACE) {
-                                    if (depth2 == 0) break;
+                                if (tt == TOK_LPAREN || tt == TOK_LBRACKET ||
+                                    tt == TOK_LBRACE)
+                                    depth2++;
+                                else if (tt == TOK_RPAREN ||
+                                         tt == TOK_RBRACKET ||
+                                         tt == TOK_RBRACE) {
+                                    if (depth2 == 0)
+                                        break;
                                     depth2--;
-                                }
-                                else if (tt == TOK_COMMA && depth2 == 0) break;
+                                } else if (tt == TOK_COMMA && depth2 == 0)
+                                    break;
                                 advance_tok(p);
                             }
                             int len = p->pos - start;
                             arg_tokens[arg_count] = &p->tokens[start];
                             arg_lens[arg_count] = len;
                             arg_count++;
-                            if (!match(p, TOK_COMMA)) break;
+                            if (!match(p, TOK_COMMA))
+                                break;
                         }
                     }
                     expect(p, TOK_RPAREN, "expected ')' after rune arguments");
 
                     if (arg_count != rune->param_count) {
-                    {
-                        char msg[128];
-                        snprintf(msg, sizeof(msg), "rune '%s' expects %d arguments, got %d", rune->name, rune->param_count, arg_count);
-                        error_at(p, t, msg);
-                    }
-                        xfree(arg_tokens); xfree(arg_lens); xfree(name);
+                        {
+                            char msg[128];
+                            snprintf(msg, sizeof(msg),
+                                     "rune '%s' expects %d arguments, got %d",
+                                     rune->name, rune->param_count, arg_count);
+                            error_at(p, t, msg);
+                        }
+                        xfree(arg_tokens);
+                        xfree(arg_lens);
+                        xfree(name);
                         return ast_new(NODE_INT_LIT, t);
                     }
 
-                    // Build expanded token stream: substitute params with arg tokens
+                    // Build expanded token stream: substitute params with arg
+                    // tokens
                     size_t exp_cap = (size_t)rune->body_token_count * 2 + 16;
                     Token *expanded = xmalloc(sizeof(Token) * exp_cap);
                     int exp_count = 0;
@@ -419,15 +492,20 @@ static AstNode *parse_primary(Parser *p) {
                         if (bt.type == TOK_IDENT) {
                             for (int j = 0; j < rune->param_count; j++) {
                                 if (bt.length == strlen(rune->param_names[j]) &&
-                                    memcmp(bt.start, rune->param_names[j], bt.length) == 0) {
-                                    // Replace this token with the argument's tokens
-                                    size_t needed = (size_t)exp_count + (size_t)arg_lens[j] + 1;
+                                    memcmp(bt.start, rune->param_names[j],
+                                           bt.length) == 0) {
+                                    // Replace this token with the argument's
+                                    // tokens
+                                    size_t needed = (size_t)exp_count +
+                                                    (size_t)arg_lens[j] + 1;
                                     if (needed >= exp_cap) {
                                         exp_cap = needed * 2;
-                                        expanded = xrealloc(expanded, sizeof(Token) * exp_cap);
+                                        expanded = xrealloc(
+                                            expanded, sizeof(Token) * exp_cap);
                                     }
                                     for (int k = 0; k < arg_lens[j]; k++) {
-                                        expanded[exp_count++] = arg_tokens[j][k];
+                                        expanded[exp_count++] =
+                                            arg_tokens[j][k];
                                     }
                                     substituted = true;
                                     break;
@@ -437,7 +515,8 @@ static AstNode *parse_primary(Parser *p) {
                         if (!substituted) {
                             if ((size_t)exp_count >= exp_cap) {
                                 exp_cap *= 2;
-                                expanded = xrealloc(expanded, sizeof(Token) * exp_cap);
+                                expanded =
+                                    xrealloc(expanded, sizeof(Token) * exp_cap);
                             }
                             expanded[exp_count++] = bt;
                         }
@@ -464,18 +543,24 @@ static AstNode *parse_primary(Parser *p) {
                     AstNode *result;
                     bool has_semicolon = false;
                     for (int i = 0; i < exp_count; i++) {
-                        if (expanded[i].type == TOK_SEMICOLON) { has_semicolon = true; break; }
+                        if (expanded[i].type == TOK_SEMICOLON) {
+                            has_semicolon = true;
+                            break;
+                        }
                     }
                     if (has_semicolon) {
-                        // Statement rune: parse multiple statements, wrap in block
+                        // Statement rune: parse multiple statements, wrap in
+                        // block
                         AstNode *stmts[256];
                         int stmt_count = 0;
                         while (!check(p, TOK_EOF) && stmt_count < 256) {
                             stmts[stmt_count++] = parse_statement(p);
                         }
                         result = ast_new(NODE_BLOCK, t);
-                        result->as.block.stmts = xmalloc(sizeof(AstNode *) * (size_t)stmt_count);
-                        memcpy(result->as.block.stmts, stmts, sizeof(AstNode *) * (size_t)stmt_count);
+                        result->as.block.stmts =
+                            xmalloc(sizeof(AstNode *) * (size_t)stmt_count);
+                        memcpy(result->as.block.stmts, stmts,
+                               sizeof(AstNode *) * (size_t)stmt_count);
                         result->as.block.stmt_count = stmt_count;
                     } else {
                         result = parse_expr(p);
@@ -501,7 +586,8 @@ static AstNode *parse_primary(Parser *p) {
 
         // Check for enum init: EnumName.Variant or EnumName.Variant(args)
         // Only treat as enum init if the name starts with an uppercase letter
-        // (enum names are PascalCase; lowercase names are variables/field access)
+        // (enum names are PascalCase; lowercase names are variables/field
+        // access)
         if (check(p, TOK_DOT) && name[0] >= 'A' && name[0] <= 'Z') {
             int saved = p->pos;
             advance_tok(p); // skip .
@@ -516,7 +602,8 @@ static AstNode *parse_primary(Parser *p) {
                         do {
                             if (arg_count >= arg_cap) {
                                 arg_cap *= 2;
-                                args = xrealloc(args, sizeof(AstNode *) * (size_t)arg_cap);
+                                args = xrealloc(args, sizeof(AstNode *) *
+                                                          (size_t)arg_cap);
                             }
                             args[arg_count++] = parse_expr(p);
                         } while (match(p, TOK_COMMA));
@@ -532,7 +619,8 @@ static AstNode *parse_primary(Parser *p) {
             }
             p->pos = saved;
         }
-        // Check for struct literal: Ident { field: val, ... } or Ident {} or Ident { ..expr }
+        // Check for struct literal: Ident { field: val, ... } or Ident {} or
+        // Ident { ..expr }
         if (check(p, TOK_LBRACE)) {
             int saved = p->pos;
             advance_tok(p); // skip {
@@ -566,11 +654,13 @@ static AstNode *parse_primary(Parser *p) {
                     AstNode *n = ast_new(NODE_STRUCT_LIT, t);
                     n->as.struct_lit.name = name;
                     int cap = 4, count = 0;
-                    FieldInit *fields = xmalloc(sizeof(FieldInit) * (size_t)cap);
+                    FieldInit *fields =
+                        xmalloc(sizeof(FieldInit) * (size_t)cap);
                     AstNode *spread = NULL;
                     do {
                         // Trailing comma: allow } after comma
-                        if (check(p, TOK_RBRACE)) break;
+                        if (check(p, TOK_RBRACE))
+                            break;
                         // Check for spread: ..expr (must be last)
                         if (check(p, TOK_DOTDOT)) {
                             advance_tok(p); // skip ..
@@ -579,9 +669,11 @@ static AstNode *parse_primary(Parser *p) {
                         }
                         if (count >= cap) {
                             cap *= 2;
-                            fields = xrealloc(fields, sizeof(FieldInit) * (size_t)cap);
+                            fields = xrealloc(fields,
+                                              sizeof(FieldInit) * (size_t)cap);
                         }
-                        Token fname = expect(p, TOK_IDENT, "expected field name");
+                        Token fname =
+                            expect(p, TOK_IDENT, "expected field name");
                         expect(p, TOK_COLON, "expected ':' in struct literal");
                         AstNode *val = parse_expr(p);
                         fields[count].name = tok_str(fname);
@@ -632,7 +724,8 @@ static AstNode *parse_primary(Parser *p) {
                 do {
                     if (count >= cap) {
                         cap *= 2;
-                        elems = xrealloc(elems, sizeof(AstNode *) * (size_t)cap);
+                        elems =
+                            xrealloc(elems, sizeof(AstNode *) * (size_t)cap);
                     }
                     elems[count++] = parse_expr(p);
                 } while (match(p, TOK_COMMA));
@@ -669,7 +762,8 @@ static AstNode *parse_primary(Parser *p) {
     return ast_new(NODE_INT_LIT, t);
 }
 
-static AstNode *parse_call(Parser *p) {
+static AstNode *parse_call(Parser *p)
+{
     AstNode *expr = parse_primary(p);
     while (true) {
         if (match(p, TOK_LPAREN)) {
@@ -715,7 +809,8 @@ static AstNode *parse_call(Parser *p) {
     return expr;
 }
 
-static AstNode *parse_unary(Parser *p) {
+static AstNode *parse_unary(Parser *p)
+{
     if (match(p, TOK_NOT) || match(p, TOK_MINUS) || match(p, TOK_TILDE)) {
         Token op = previous(p);
         AstNode *operand = parse_unary(p);
@@ -727,7 +822,9 @@ static AstNode *parse_unary(Parser *p) {
     return parse_call(p);
 }
 
-static AstNode *parse_binary(Parser *p, AstNode *(*sub)(Parser *), int n_ops, const TokenType *ops) {
+static AstNode *parse_binary(Parser *p, AstNode *(*sub)(Parser *), int n_ops,
+                             const TokenType *ops)
+{
     AstNode *left = sub(p);
     while (true) {
         bool found = false;
@@ -744,73 +841,88 @@ static AstNode *parse_binary(Parser *p, AstNode *(*sub)(Parser *), int n_ops, co
                 break;
             }
         }
-        if (!found) break;
+        if (!found)
+            break;
     }
     return left;
 }
 
-static AstNode *parse_exponent(Parser *p) {
-    static const TokenType ops[] = { TOK_STARSTAR };
+static AstNode *parse_exponent(Parser *p)
+{
+    static const TokenType ops[] = {TOK_STARSTAR};
     return parse_binary(p, parse_unary, 1, ops);
 }
 
-static AstNode *parse_multiplication(Parser *p) {
-    static const TokenType ops[] = { TOK_STAR, TOK_SLASH, TOK_PERCENT, TOK_PERCENT_PERCENT };
+static AstNode *parse_multiplication(Parser *p)
+{
+    static const TokenType ops[] = {TOK_STAR, TOK_SLASH, TOK_PERCENT,
+                                    TOK_PERCENT_PERCENT};
     return parse_binary(p, parse_exponent, 4, ops);
 }
 
-static AstNode *parse_addition(Parser *p) {
-    static const TokenType ops[] = { TOK_PLUS, TOK_MINUS };
+static AstNode *parse_addition(Parser *p)
+{
+    static const TokenType ops[] = {TOK_PLUS, TOK_MINUS};
     return parse_binary(p, parse_multiplication, 2, ops);
 }
 
-static AstNode *parse_shift(Parser *p) {
-    static const TokenType ops[] = { TOK_SHL, TOK_SHR };
+static AstNode *parse_shift(Parser *p)
+{
+    static const TokenType ops[] = {TOK_SHL, TOK_SHR};
     return parse_binary(p, parse_addition, 2, ops);
 }
 
-static AstNode *parse_comparison(Parser *p) {
-    static const TokenType ops[] = { TOK_LT, TOK_GT, TOK_LTE, TOK_GTE };
+static AstNode *parse_comparison(Parser *p)
+{
+    static const TokenType ops[] = {TOK_LT, TOK_GT, TOK_LTE, TOK_GTE};
     return parse_binary(p, parse_shift, 4, ops);
 }
 
-static AstNode *parse_equality(Parser *p) {
-    static const TokenType ops[] = { TOK_EQ, TOK_NEQ };
+static AstNode *parse_equality(Parser *p)
+{
+    static const TokenType ops[] = {TOK_EQ, TOK_NEQ};
     return parse_binary(p, parse_comparison, 2, ops);
 }
 
-static AstNode *parse_bitwise_and(Parser *p) {
-    static const TokenType ops[] = { TOK_AMP, TOK_AMP_TILDE };
+static AstNode *parse_bitwise_and(Parser *p)
+{
+    static const TokenType ops[] = {TOK_AMP, TOK_AMP_TILDE};
     return parse_binary(p, parse_equality, 2, ops);
 }
 
-static AstNode *parse_bitwise_xor(Parser *p) {
-    static const TokenType ops[] = { TOK_CARET };
+static AstNode *parse_bitwise_xor(Parser *p)
+{
+    static const TokenType ops[] = {TOK_CARET};
     return parse_binary(p, parse_bitwise_and, 1, ops);
 }
 
-static AstNode *parse_bitwise_or(Parser *p) {
-    static const TokenType ops[] = { TOK_PIPE };
+static AstNode *parse_bitwise_or(Parser *p)
+{
+    static const TokenType ops[] = {TOK_PIPE};
     return parse_binary(p, parse_bitwise_xor, 1, ops);
 }
 
-static AstNode *parse_logic_and(Parser *p) {
-    static const TokenType ops[] = { TOK_AND };
+static AstNode *parse_logic_and(Parser *p)
+{
+    static const TokenType ops[] = {TOK_AND};
     return parse_binary(p, parse_bitwise_or, 1, ops);
 }
 
-static AstNode *parse_logic_or(Parser *p) {
-    static const TokenType ops[] = { TOK_OR };
+static AstNode *parse_logic_or(Parser *p)
+{
+    static const TokenType ops[] = {TOK_OR};
     return parse_binary(p, parse_logic_and, 1, ops);
 }
 
-static AstNode *parse_expr(Parser *p) {
+static AstNode *parse_expr(Parser *p)
+{
     return parse_logic_or(p);
 }
 
 // ---- Statement parsing ----
 
-static AstNode *parse_block(Parser *p) {
+static AstNode *parse_block(Parser *p)
+{
     expect(p, TOK_LBRACE, "expected '{'");
     AstNode *block = ast_new(NODE_BLOCK, previous(p));
     int cap = 8, count = 0;
@@ -821,7 +933,8 @@ static AstNode *parse_block(Parser *p) {
             stmts = xrealloc(stmts, sizeof(AstNode *) * (size_t)cap);
         }
         stmts[count++] = parse_statement(p);
-        if (p->had_error) break;
+        if (p->had_error)
+            break;
     }
     expect(p, TOK_RBRACE, "expected '}'");
     block->as.block.stmts = stmts;
@@ -829,7 +942,8 @@ static AstNode *parse_block(Parser *p) {
     return block;
 }
 
-static AstNode *parse_let(Parser *p) {
+static AstNode *parse_let(Parser *p)
+{
     Token let_tok = expect(p, TOK_LET, "expected 'let'");
     bool is_mut = match(p, TOK_MUT);
 
@@ -839,7 +953,8 @@ static AstNode *parse_let(Parser *p) {
         char *names[16];
         int name_count = 0;
         do {
-            Token nt = expect(p, TOK_IDENT, "expected variable name in destructuring");
+            Token nt =
+                expect(p, TOK_IDENT, "expected variable name in destructuring");
             names[name_count++] = tok_str(nt);
         } while (match(p, TOK_COMMA));
         expect(p, TOK_RPAREN, "expected ')' after destructuring names");
@@ -855,7 +970,8 @@ static AstNode *parse_let(Parser *p) {
         n->as.let_stmt.init = init;
         n->as.let_stmt.is_destructure = true;
         n->as.let_stmt.names = xmalloc(sizeof(char *) * (size_t)name_count);
-        memcpy(n->as.let_stmt.names, names, sizeof(char *) * (size_t)name_count);
+        memcpy(n->as.let_stmt.names, names,
+               sizeof(char *) * (size_t)name_count);
         n->as.let_stmt.name_count = name_count;
         return n;
     }
@@ -877,7 +993,8 @@ static AstNode *parse_let(Parser *p) {
     return n;
 }
 
-static AstNode *parse_if(Parser *p) {
+static AstNode *parse_if(Parser *p)
+{
     Token if_tok = expect(p, TOK_IF, "expected 'if'");
     AstNode *cond = parse_expr(p);
     AstNode *then_block = parse_block(p);
@@ -896,7 +1013,8 @@ static AstNode *parse_if(Parser *p) {
     return n;
 }
 
-static AstNode *parse_while(Parser *p) {
+static AstNode *parse_while(Parser *p)
+{
     Token while_tok = expect(p, TOK_WHILE, "expected 'while'");
     AstNode *cond = parse_expr(p);
     AstNode *body = parse_block(p);
@@ -906,7 +1024,8 @@ static AstNode *parse_while(Parser *p) {
     return n;
 }
 
-static AstNode *parse_do_while(Parser *p) {
+static AstNode *parse_do_while(Parser *p)
+{
     Token do_tok = expect(p, TOK_DO, "expected 'do'");
     AstNode *body = parse_block(p);
     expect(p, TOK_WHILE, "expected 'while' after do block");
@@ -918,7 +1037,8 @@ static AstNode *parse_do_while(Parser *p) {
     return n;
 }
 
-static AstNode *parse_for(Parser *p) {
+static AstNode *parse_for(Parser *p)
+{
     Token for_tok = expect(p, TOK_FOR, "expected 'for'");
 
     // Tuple destructuring: for (k, v) in arr { }
@@ -927,7 +1047,8 @@ static AstNode *parse_for(Parser *p) {
         char *names[16];
         int name_count = 0;
         do {
-            Token nt = expect(p, TOK_IDENT, "expected variable name in destructuring");
+            Token nt =
+                expect(p, TOK_IDENT, "expected variable name in destructuring");
             names[name_count++] = tok_str(nt);
         } while (match(p, TOK_COMMA));
         expect(p, TOK_RPAREN, "expected ')' after destructuring names");
@@ -944,7 +1065,8 @@ static AstNode *parse_for(Parser *p) {
         n->as.for_stmt.body = body;
         n->as.for_stmt.is_destructure = true;
         n->as.for_stmt.var_names = xmalloc(sizeof(char *) * (size_t)name_count);
-        memcpy(n->as.for_stmt.var_names, names, sizeof(char *) * (size_t)name_count);
+        memcpy(n->as.for_stmt.var_names, names,
+               sizeof(char *) * (size_t)name_count);
         n->as.for_stmt.var_count = name_count;
         return n;
     }
@@ -956,7 +1078,8 @@ static AstNode *parse_for(Parser *p) {
     // Check if this is a range (expr .. expr) or foreach (expr is iterable)
     if (check(p, TOK_DOTDOT) || check(p, TOK_DOTDOTEQ)) {
         bool inclusive = match(p, TOK_DOTDOTEQ);
-        if (!inclusive) expect(p, TOK_DOTDOT, "expected '..'");
+        if (!inclusive)
+            expect(p, TOK_DOTDOT, "expected '..'");
         AstNode *end = parse_expr(p);
         AstNode *body = parse_block(p);
         AstNode *n = ast_new(NODE_FOR_STMT, for_tok);
@@ -985,7 +1108,8 @@ static AstNode *parse_for(Parser *p) {
     return n;
 }
 
-static AstNode *parse_return(Parser *p) {
+static AstNode *parse_return(Parser *p)
+{
     Token return_tok = expect(p, TOK_RETURN, "expected 'return'");
     AstNode *val = NULL;
     if (!check(p, TOK_SEMICOLON)) {
@@ -997,18 +1121,22 @@ static AstNode *parse_return(Parser *p) {
     return n;
 }
 
-static bool is_lvalue(AstNode *n) {
-    return n->kind == NODE_IDENT || n->kind == NODE_FIELD_ACCESS || n->kind == NODE_INDEX;
+static bool is_lvalue(AstNode *n)
+{
+    return n->kind == NODE_IDENT || n->kind == NODE_FIELD_ACCESS ||
+           n->kind == NODE_INDEX;
 }
 
-static bool is_assign_op(TokenType t) {
+static bool is_assign_op(TokenType t)
+{
     return t == TOK_ASSIGN || t == TOK_PLUS_EQ || t == TOK_MINUS_EQ ||
            t == TOK_STAR_EQ || t == TOK_SLASH_EQ || t == TOK_PERCENT_EQ ||
            t == TOK_AMP_EQ || t == TOK_PIPE_EQ || t == TOK_CARET_EQ ||
            t == TOK_SHL_EQ || t == TOK_SHR_EQ;
 }
 
-static AstNode *parse_match(Parser *p) {
+static AstNode *parse_match(Parser *p)
+{
     Token match_tok = expect(p, TOK_MATCH, "expected 'match'");
     AstNode *target = parse_expr(p);
     expect(p, TOK_LBRACE, "expected '{' after match target");
@@ -1032,20 +1160,23 @@ static AstNode *parse_match(Parser *p) {
         arms[count].pattern_expr = NULL;
 
         // Check what kind of pattern this is
-        if (check(p, TOK_INT_LIT) || check(p, TOK_STR_LIT) || check(p, TOK_TRUE) || check(p, TOK_FALSE)) {
+        if (check(p, TOK_INT_LIT) || check(p, TOK_STR_LIT) ||
+            check(p, TOK_TRUE) || check(p, TOK_FALSE)) {
             // Literal pattern: 42, "hello", true, false
             arms[count].pattern_expr = parse_primary(p);
         } else if (check(p, TOK_MINUS) && peek_next_type(p) == TOK_INT_LIT) {
             // Negative integer literal: -1
             arms[count].pattern_expr = parse_unary(p);
-        } else if (check(p, TOK_IDENT) && current(p).length == 1 && current(p).start[0] == '_' &&
+        } else if (check(p, TOK_IDENT) && current(p).length == 1 &&
+                   current(p).start[0] == '_' &&
                    peek_next_type(p) == TOK_ARROW) {
             // Wildcard: _
             advance_tok(p); // consume '_'
             arms[count].is_wildcard = true;
         } else {
             // Enum pattern: EnumName.Variant or EnumName.Variant(bindings)
-            Token enum_tok = expect(p, TOK_IDENT, "expected pattern in match arm");
+            Token enum_tok =
+                expect(p, TOK_IDENT, "expected pattern in match arm");
             expect(p, TOK_DOT, "expected '.' after enum name");
             Token var_tok = expect(p, TOK_IDENT, "expected variant name");
 
@@ -1059,7 +1190,8 @@ static AstNode *parse_match(Parser *p) {
                     do {
                         if (bcount >= bcap) {
                             bcap *= 2;
-                            bindings = xrealloc(bindings, sizeof(char *) * (size_t)bcap);
+                            bindings = xrealloc(bindings,
+                                                sizeof(char *) * (size_t)bcap);
                         }
                         Token b = expect(p, TOK_IDENT, "expected binding name");
                         bindings[bcount++] = tok_str(b);
@@ -1084,10 +1216,12 @@ static AstNode *parse_match(Parser *p) {
     return n;
 }
 
-static AstNode *parse_emit(Parser *p, bool is_toplevel) {
+static AstNode *parse_emit(Parser *p, bool is_toplevel)
+{
     Token emit_tok = expect(p, TOK_EMIT, "expected __emit__");
     expect(p, TOK_LPAREN, "expected '('");
-    Token str_tok = expect(p, TOK_STR_LIT, "expected string literal after __emit__");
+    Token str_tok =
+        expect(p, TOK_STR_LIT, "expected string literal after __emit__");
     expect(p, TOK_RPAREN, "expected ')'");
     expect(p, TOK_SEMICOLON, "expected ';' after __emit__");
 
@@ -1097,15 +1231,24 @@ static AstNode *parse_emit(Parser *p, bool is_toplevel) {
     return n;
 }
 
-static AstNode *parse_statement(Parser *p) {
-    if (check(p, TOK_LET)) return parse_let(p);
-    if (check(p, TOK_IF)) return parse_if(p);
-    if (check(p, TOK_WHILE)) return parse_while(p);
-    if (check(p, TOK_DO)) return parse_do_while(p);
-    if (check(p, TOK_FOR)) return parse_for(p);
-    if (check(p, TOK_MATCH)) return parse_match(p);
-    if (check(p, TOK_EMIT)) return parse_emit(p, false);
-    if (check(p, TOK_RETURN)) return parse_return(p);
+static AstNode *parse_statement(Parser *p)
+{
+    if (check(p, TOK_LET))
+        return parse_let(p);
+    if (check(p, TOK_IF))
+        return parse_if(p);
+    if (check(p, TOK_WHILE))
+        return parse_while(p);
+    if (check(p, TOK_DO))
+        return parse_do_while(p);
+    if (check(p, TOK_FOR))
+        return parse_for(p);
+    if (check(p, TOK_MATCH))
+        return parse_match(p);
+    if (check(p, TOK_EMIT))
+        return parse_emit(p, false);
+    if (check(p, TOK_RETURN))
+        return parse_return(p);
     if (match(p, TOK_BREAK)) {
         expect(p, TOK_SEMICOLON, "expected ';' after break");
         return ast_new(NODE_BREAK_STMT, previous(p));
@@ -1131,7 +1274,8 @@ static AstNode *parse_statement(Parser *p) {
         one->as.int_lit.value = 1;
         AstNode *n = ast_new(NODE_ASSIGN_STMT, op);
         n->as.assign_stmt.target = target;
-        n->as.assign_stmt.op = (op.type == TOK_PLUSPLUS) ? TOK_PLUS_EQ : TOK_MINUS_EQ;
+        n->as.assign_stmt.op =
+            (op.type == TOK_PLUSPLUS) ? TOK_PLUS_EQ : TOK_MINUS_EQ;
         n->as.assign_stmt.value = one;
         return n;
     }
@@ -1145,14 +1289,16 @@ static AstNode *parse_statement(Parser *p) {
     }
 
     // Postfix increment/decrement: x++; or x--;
-    if (is_lvalue(expr) && (check(p, TOK_PLUSPLUS) || check(p, TOK_MINUSMINUS))) {
+    if (is_lvalue(expr) &&
+        (check(p, TOK_PLUSPLUS) || check(p, TOK_MINUSMINUS))) {
         Token op = advance_tok(p);
         expect(p, TOK_SEMICOLON, "expected ';' after increment/decrement");
         AstNode *one = ast_new(NODE_INT_LIT, op);
         one->as.int_lit.value = 1;
         AstNode *n = ast_new(NODE_ASSIGN_STMT, op);
         n->as.assign_stmt.target = expr;
-        n->as.assign_stmt.op = (op.type == TOK_PLUSPLUS) ? TOK_PLUS_EQ : TOK_MINUS_EQ;
+        n->as.assign_stmt.op =
+            (op.type == TOK_PLUSPLUS) ? TOK_PLUS_EQ : TOK_MINUS_EQ;
         n->as.assign_stmt.value = one;
         return n;
     }
@@ -1176,7 +1322,8 @@ static AstNode *parse_statement(Parser *p) {
 
 // ---- Top-level parsing ----
 
-static AstNode *parse_fn_decl(Parser *p) {
+static AstNode *parse_fn_decl(Parser *p)
+{
     expect(p, TOK_FN, "expected 'fn'");
     Token name = expect(p, TOK_IDENT, "expected function name");
     expect(p, TOK_LPAREN, "expected '('");
@@ -1203,7 +1350,8 @@ static AstNode *parse_fn_decl(Parser *p) {
                 params[count].default_value = parse_expr(p);
             } else {
                 if (count > 0 && params[count - 1].default_value != NULL) {
-                    error_at(p, pname, "non-default argument follow default argument");
+                    error_at(p, pname,
+                             "non-default argument follow default argument");
                 }
                 params[count].default_value = NULL;
             }
@@ -1231,7 +1379,8 @@ static AstNode *parse_fn_decl(Parser *p) {
     return n;
 }
 
-static AstNode *parse_struct_decl(Parser *p) {
+static AstNode *parse_struct_decl(Parser *p)
+{
     Token struct_tok = expect(p, TOK_STRUCT, "expected 'struct'");
     Token name = expect(p, TOK_IDENT, "expected struct name");
     expect(p, TOK_LBRACE, "expected '{'");
@@ -1244,12 +1393,15 @@ static AstNode *parse_struct_decl(Parser *p) {
             fields = xrealloc(fields, sizeof(Param) * (size_t)cap);
         }
         Token fname = expect(p, TOK_IDENT, "expected field name");
-        if (p->had_error) break;
+        if (p->had_error)
+            break;
         expect(p, TOK_COLON, "expected ':' after field name");
-        if (p->had_error) break;
+        if (p->had_error)
+            break;
         AstType *ftype = parse_type(p);
         expect(p, TOK_SEMICOLON, "expected ';' after field");
-        if (p->had_error) break;
+        if (p->had_error)
+            break;
         fields[count].name = tok_str(fname);
         fields[count].type = ftype;
         count++;
@@ -1263,7 +1415,8 @@ static AstNode *parse_struct_decl(Parser *p) {
     return n;
 }
 
-static AstNode *parse_enum_decl(Parser *p) {
+static AstNode *parse_enum_decl(Parser *p)
+{
     Token enum_tok = expect(p, TOK_ENUM, "expected 'enum'");
     Token name = expect(p, TOK_IDENT, "expected enum name");
     expect(p, TOK_LBRACE, "expected '{'");
@@ -1277,7 +1430,8 @@ static AstNode *parse_enum_decl(Parser *p) {
             variants = xrealloc(variants, sizeof(EnumVariant) * (size_t)cap);
         }
         Token vname = expect(p, TOK_IDENT, "expected variant name");
-        if (p->had_error) break;
+        if (p->had_error)
+            break;
         variants[count].name = tok_str(vname);
         variants[count].fields = NULL;
         variants[count].field_count = 0;
@@ -1292,24 +1446,29 @@ static AstNode *parse_enum_decl(Parser *p) {
                         fields = xrealloc(fields, sizeof(Param) * (size_t)fcap);
                     }
                     Token fname = expect(p, TOK_IDENT, "expected field name");
-                    if (p->had_error) break;
+                    if (p->had_error)
+                        break;
                     expect(p, TOK_COLON, "expected ':' after field name");
-                    if (p->had_error) break;
+                    if (p->had_error)
+                        break;
                     AstType *ftype = parse_type(p);
                     fields[fcount].name = tok_str(fname);
                     fields[fcount].type = ftype;
                     fcount++;
                 } while (match(p, TOK_COMMA));
             }
-            if (p->had_error) break;
+            if (p->had_error)
+                break;
             expect(p, TOK_RPAREN, "expected ')' after variant fields");
-            if (p->had_error) break;
+            if (p->had_error)
+                break;
             variants[count].fields = fields;
             variants[count].field_count = fcount;
         }
 
         expect(p, TOK_SEMICOLON, "expected ';' after variant");
-        if (p->had_error) break;
+        if (p->had_error)
+            break;
         count++;
     }
     expect(p, TOK_RBRACE, "expected '}'");
@@ -1321,7 +1480,8 @@ static AstNode *parse_enum_decl(Parser *p) {
     return n;
 }
 
-static AstNode *parse_import(Parser *p) {
+static AstNode *parse_import(Parser *p)
+{
     Token import_tok = expect(p, TOK_IMPORT, "expected 'import'");
     AstNode *n = ast_new(NODE_IMPORT, import_tok);
 
@@ -1333,10 +1493,12 @@ static AstNode *parse_import(Parser *p) {
     } else if (check(p, TOK_IDENT)) {
         // import module_name
         Token module_name = advance_tok(p);
-        n->as.import_decl.path = tok_str(module_name); // store raw name (e.g "math")
+        n->as.import_decl.path =
+            tok_str(module_name); // store raw name (e.g "math")
         n->as.import_decl.is_stdlib = true;
     } else {
-        error_at(p, current(p), "expected \"FILENAME\" or MODULE_NAME after import");
+        error_at(p, current(p),
+                 "expected \"FILENAME\" or MODULE_NAME after import");
     }
 
     expect(p, TOK_SEMICOLON, "expected ';' after import");
@@ -1344,7 +1506,8 @@ static AstNode *parse_import(Parser *p) {
 }
 
 // ---- Rune declaration: rune name(p1, p2) { body tokens } ----
-static AstNode *parse_rune_decl(Parser *p) {
+static AstNode *parse_rune_decl(Parser *p)
+{
     Token rune_tok = advance_tok(p); // consume 'rune'
     Token name_tok = expect(p, TOK_IDENT, "expected rune name");
     char *name = tok_str(name_tok);
@@ -1372,10 +1535,12 @@ static AstNode *parse_rune_decl(Parser *p) {
     int depth = 1;
     while (!at_end(p) && depth > 0) {
         Token tok = current(p);
-        if (tok.type == TOK_LBRACE) depth++;
+        if (tok.type == TOK_LBRACE)
+            depth++;
         if (tok.type == TOK_RBRACE) {
             depth--;
-            if (depth == 0) break;
+            if (depth == 0)
+                break;
         }
         if (bcount >= bcap) {
             bcap *= 2;
@@ -1389,12 +1554,15 @@ static AstNode *parse_rune_decl(Parser *p) {
     // Register in rune table
     if (rune_count < MAX_RUNES) {
         rune_defs[rune_count].name = strdup(name);
-        rune_defs[rune_count].param_names = xmalloc(sizeof(char *) * (size_t)pcount);
+        rune_defs[rune_count].param_names =
+            xmalloc(sizeof(char *) * (size_t)pcount);
         for (int i = 0; i < pcount; i++)
             rune_defs[rune_count].param_names[i] = strdup(params[i]);
         rune_defs[rune_count].param_count = pcount;
-        rune_defs[rune_count].body_tokens = xmalloc(sizeof(Token) * (size_t)bcount);
-        memcpy(rune_defs[rune_count].body_tokens, body, sizeof(Token) * (size_t)bcount);
+        rune_defs[rune_count].body_tokens =
+            xmalloc(sizeof(Token) * (size_t)bcount);
+        memcpy(rune_defs[rune_count].body_tokens, body,
+               sizeof(Token) * (size_t)bcount);
         rune_defs[rune_count].body_token_count = bcount;
         rune_count++;
     } else {
@@ -1410,7 +1578,8 @@ static AstNode *parse_rune_decl(Parser *p) {
     return n;
 }
 
-static AstNode *parse_const_decl(Parser *p) {
+static AstNode *parse_const_decl(Parser *p)
+{
     Token t = expect(p, TOK_CONST, "expected 'const'");
     Token name = expect(p, TOK_IDENT, "expected constant name");
     expect(p, TOK_COLON, "expected ':' after constant name");
@@ -1426,7 +1595,8 @@ static AstNode *parse_const_decl(Parser *p) {
     return n;
 }
 
-static AstNode *parse_type_alias(Parser *p) {
+static AstNode *parse_type_alias(Parser *p)
+{
     Token t = expect(p, TOK_TYPE, "expected 'type'");
     Token name = expect(p, TOK_IDENT, "expected alias name");
     expect(p, TOK_ASSIGN, "expected '=' in type alias");
@@ -1439,19 +1609,29 @@ static AstNode *parse_type_alias(Parser *p) {
     return n;
 }
 
-static AstNode *parse_declaration(Parser *p) {
-    if (check(p, TOK_FN)) return parse_fn_decl(p);
-    if (check(p, TOK_STRUCT)) return parse_struct_decl(p);
-    if (check(p, TOK_ENUM)) return parse_enum_decl(p);
-    if (check(p, TOK_IMPORT)) return parse_import(p);
-    if (check(p, TOK_RUNE)) return parse_rune_decl(p);
-    if (check(p, TOK_CONST)) return parse_const_decl(p);
-    if (check(p, TOK_TYPE)) return parse_type_alias(p);
-    if (check(p, TOK_EMIT)) return parse_emit(p,true);
+static AstNode *parse_declaration(Parser *p)
+{
+    if (check(p, TOK_FN))
+        return parse_fn_decl(p);
+    if (check(p, TOK_STRUCT))
+        return parse_struct_decl(p);
+    if (check(p, TOK_ENUM))
+        return parse_enum_decl(p);
+    if (check(p, TOK_IMPORT))
+        return parse_import(p);
+    if (check(p, TOK_RUNE))
+        return parse_rune_decl(p);
+    if (check(p, TOK_CONST))
+        return parse_const_decl(p);
+    if (check(p, TOK_TYPE))
+        return parse_type_alias(p);
+    if (check(p, TOK_EMIT))
+        return parse_emit(p, true);
     return parse_statement(p);
 }
 
-AstNode *parser_parse(Parser *p) {
+AstNode *parser_parse(Parser *p)
+{
     rune_count = 0; // reset rune table
     AstNode *program = ast_new(NODE_PROGRAM, current(p));
     int cap = 16, count = 0;

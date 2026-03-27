@@ -1,9 +1,9 @@
 #include "preprocess.h"
+#include "ast.h"
+#include "common.h"
 #include "lexer.h"
 #include "parser.h"
 #include "util.h"
-#include "ast.h"
-#include "common.h"
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -15,32 +15,40 @@
 static const char *imported_files[MAX_IMPORTS];
 static int import_count = 0;
 
-static bool already_imported(const char *path) {
+static bool already_imported(const char *path)
+{
     for (int i = 0; i < import_count; i++) {
-        if (strcmp(path, imported_files[i]) == 0) return true;
+        if (strcmp(path, imported_files[i]) == 0)
+            return true;
     }
     return false;
 }
 
 // TODO: Add check if path is same with URUSCPATH even though is using "../"
-static bool is_path_allowed(char *path) {
+static bool is_path_allowed(char *path)
+{
     char *p = path;
     while (*p) {
-        while (*p == '/' || *p == '\\') p++;
+        while (*p == '/' || *p == '\\')
+            p++;
         const char *start = p;
-        while (*p && *p != '/' && *p != '\\') p++;
+        while (*p && *p != '/' && *p != '\\')
+            p++;
         size_t len = (size_t)(p - start);
-        if (len == 2 && start[0] == '.' && start[1] == '.') return false;
+        if (len == 2 && start[0] == '.' && start[1] == '.')
+            return false;
     }
     return true;
 }
 
-void get_local_libpath(char *out, size_t size) {
+void get_local_libpath(char *out, size_t size)
+{
 
 #if defined(_WIN32)
     // Windows, check registry or fallback to default
     const char *drive = getenv("SystemDrive");
-    if (!drive) drive = "C:";
+    if (!drive)
+        drive = "C:";
     snprintf(out, size, "%s\\Program Files\\Urusc\\Lib", drive);
 
 #elif defined(__ANDROID__)
@@ -59,8 +67,7 @@ void get_local_libpath(char *out, size_t size) {
         snprintf(out, size, "%s", prefix);
     } else {
         char local_path[512];
-        snprintf(local_path, sizeof(local_path),
-                 "/usr/local/lib/urusc");
+        snprintf(local_path, sizeof(local_path), "/usr/local/lib/urusc");
 
         // if local exists = the user is building the compiler itself
         FILE *f = fopen(local_path, "r");
@@ -79,7 +86,8 @@ void get_local_libpath(char *out, size_t size) {
 }
 
 // resolve library import path
-static char *resolve_stdlib_path(const char *module_name) {
+static char *resolve_stdlib_path(const char *module_name)
+{
     char urus_path[PATH_MAX];
     get_local_libpath(urus_path, sizeof(urus_path));
 
@@ -93,11 +101,13 @@ static char *resolve_stdlib_path(const char *module_name) {
 }
 
 // resolve relative import path
-static char *resolve_import_path(const char *base_file, const char *import_path) {
+static char *resolve_import_path(const char *base_file, const char *import_path)
+{
     // Find last / or backslash in base_file
     const char *last_sep = NULL;
     for (const char *p = base_file; *p; p++) {
-        if (*p == '/' || *p == '\\') last_sep = p;
+        if (*p == '/' || *p == '\\')
+            last_sep = p;
     }
 
     if (!last_sep) {
@@ -113,7 +123,8 @@ static char *resolve_import_path(const char *base_file, const char *import_path)
     return full;
 }
 
-bool preprocess_imports(AstNode *program, const char *base_file) {
+bool preprocess_imports(AstNode *program, const char *base_file)
+{
     if (import_count >= MAX_IMPORTS) {
         fprintf(stderr, "Error: too many imports (max %d)\n", MAX_IMPORTS);
         return false;
@@ -124,7 +135,8 @@ bool preprocess_imports(AstNode *program, const char *base_file) {
 
     for (int i = 0; i < program->as.program.decl_count; i++) {
         AstNode *d = program->as.program.decls[i];
-        if (d->kind != NODE_IMPORT) continue;
+        if (d->kind != NODE_IMPORT)
+            continue;
 
         char *path;
 
@@ -133,7 +145,9 @@ bool preprocess_imports(AstNode *program, const char *base_file) {
         } else {
             path = resolve_import_path(base_file, d->as.import_decl.path);
             if (!is_path_allowed(path)) {
-                fprintf(stderr, "Error: import path '%s' resolves outside allowed directories\n",
+                fprintf(stderr,
+                        "Error: import path '%s' resolves outside allowed "
+                        "directories\n",
                         d->as.import_decl.path);
                 xfree(path);
                 return false;
@@ -155,8 +169,11 @@ bool preprocess_imports(AstNode *program, const char *base_file) {
         size_t len;
         char *source = read_file(path, &len);
         if (!source) {
-            fprintf(stderr, "Error: cannot import '%s'\n", d->as.import_decl.path);
-            if (d->as.import_decl.is_stdlib) fprintf(stderr, "Tip: make sure you've installed urus stdlib correctly in your environment\n");
+            fprintf(stderr, "Error: cannot import '%s'\n",
+                    d->as.import_decl.path);
+            if (d->as.import_decl.is_stdlib)
+                fprintf(stderr, "Tip: make sure you've installed urus stdlib "
+                                "correctly in your environment\n");
             return false;
         }
 
@@ -190,9 +207,12 @@ bool preprocess_imports(AstNode *program, const char *base_file) {
             return false;
         }
 
-        // Merge imported declarations into program (insert before current position)
-        int new_count = program->as.program.decl_count + imported->as.program.decl_count - 1;
-        AstNode **new_decls = xmalloc(sizeof(AstNode *) * (size_t)(new_count + 1));
+        // Merge imported declarations into program (insert before current
+        // position)
+        int new_count = program->as.program.decl_count +
+                        imported->as.program.decl_count - 1;
+        AstNode **new_decls =
+            xmalloc(sizeof(AstNode *) * (size_t)(new_count + 1));
 
         int pos = 0;
         // Copy declarations before the import statement
