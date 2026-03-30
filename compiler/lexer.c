@@ -493,6 +493,10 @@ Token *lexer_tokenize(Lexer *l, int *count)
 
     while (1) {
         if (n >= cap) {
+            if (cap > INT_MAX / 2) {
+                fprintf(stderr, "Error: source file too large (token limit exceeded)\n");
+                exit(1);
+            }
             cap *= 2;
             tokens = xrealloc(tokens, sizeof(Token) * (size_t)cap);
         }
