@@ -510,6 +510,10 @@ static AstNode *parse_primary(Parser *p)
                                     size_t needed = (size_t)exp_count +
                                                     (size_t)arg_lens[j] + 1;
                                     if (needed >= exp_cap) {
+                                        if (needed > SIZE_MAX / (2 * sizeof(Token))) {
+                                            fprintf(stderr, "Error: rune expansion too large\n");
+                                            exit(1);
+                                        }
                                         exp_cap = needed * 2;
                                         expanded = xrealloc(
                                             expanded, sizeof(Token) * exp_cap);
@@ -525,6 +529,10 @@ static AstNode *parse_primary(Parser *p)
                         }
                         if (!substituted) {
                             if ((size_t)exp_count >= exp_cap) {
+                                if (exp_cap > SIZE_MAX / (2 * sizeof(Token))) {
+                                    fprintf(stderr, "Error: rune expansion too large\n");
+                                    exit(1);
+                                }
                                 exp_cap *= 2;
                                 expanded =
                                     xrealloc(expanded, sizeof(Token) * exp_cap);
