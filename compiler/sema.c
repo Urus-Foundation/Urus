@@ -308,16 +308,21 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node)
                 (obj_type->kind == TYPE_NAMED || obj_type->kind == TYPE_STR ||
                  obj_type->kind == TYPE_ARRAY)) {
                 // Build the function name
-                char fn_name_buf[256];
+                char fn_name_buf[512];
+                int fn_len;
                 if (obj_type->kind == TYPE_STR) {
-                    snprintf(fn_name_buf, sizeof(fn_name_buf), "str_%s",
+                    fn_len = snprintf(fn_name_buf, sizeof(fn_name_buf), "str_%s",
                              method);
                 } else if (obj_type->kind == TYPE_ARRAY) {
                     // Array methods map directly: arr.len() -> len(arr)
-                    snprintf(fn_name_buf, sizeof(fn_name_buf), "%s", method);
+                    fn_len = snprintf(fn_name_buf, sizeof(fn_name_buf), "%s", method);
                 } else {
-                    snprintf(fn_name_buf, sizeof(fn_name_buf), "%s_%s",
+                    fn_len = snprintf(fn_name_buf, sizeof(fn_name_buf), "%s_%s",
                              obj_type->name, method);
+                }
+                if (fn_len >= (int)sizeof(fn_name_buf)) {
+                    sema_error(ctx, &node->tok, "method name too long");
+                    return NULL;
                 }
                 SemaSymbol *method_sym =
                     scope_lookup(ctx->current, fn_name_buf);

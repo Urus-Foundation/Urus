@@ -1666,9 +1666,14 @@ void codegen_generate(CodeBuf *buf, AstNode *program)
             for (int j = 0; j < d->as.struct_decl.field_count; j++) {
                 AstType *ft = d->as.struct_decl.fields[j].type;
                 if (type_needs_drop(ft)) {
-                    char field_acc[256];
-                    snprintf(field_acc, sizeof(field_acc), "(*obj)->%s",
+                    char field_acc[512];
+                    int fa_len = snprintf(field_acc, sizeof(field_acc), "(*obj)->%s",
                              d->as.struct_decl.fields[j].name);
+                    if (fa_len >= (int)sizeof(field_acc)) {
+                        fprintf(stderr, "Error: field name too long: %s\n",
+                                d->as.struct_decl.fields[j].name);
+                        exit(1);
+                    }
                     emit(buf, "        ");
                     emit_type_drop_cname(buf, ft, field_acc);
                 }
@@ -1696,9 +1701,13 @@ void codegen_generate(CodeBuf *buf, AstNode *program)
                          d->as.enum_decl.name, v->name);
                     for (int k = 0; k < v->field_count; k++) {
                         if (type_needs_drop(v->fields[k].type)) {
-                            char field_acc[256];
-                            snprintf(field_acc, sizeof(field_acc),
+                            char field_acc[512];
+                            int fa_len = snprintf(field_acc, sizeof(field_acc),
                                      "(*obj)->data.%s.f%d", v->name, k);
+                            if (fa_len >= (int)sizeof(field_acc)) {
+                                fprintf(stderr, "Error: variant name too long: %s\n", v->name);
+                                exit(1);
+                            }
                             emit(buf, "                ");
                             emit_type_drop_cname(buf, v->fields[k].type,
                                                  field_acc);
