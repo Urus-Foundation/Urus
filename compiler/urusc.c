@@ -323,9 +323,21 @@ int main(int argc, char **argv)
 #ifdef _WIN32
             int run_ret = (int)_spawnl(_P_WAIT, out_path, out_path, NULL);
 #else
-            char run_cmd[8192];
-            snprintf(run_cmd, sizeof(run_cmd), "./%s", out_path);
-            int run_ret = system(run_cmd);
+            // Use fork/execl to avoid shell injection via crafted output names
+            int run_ret;
+            pid_t run_pid = fork();
+            if (run_pid == 0) {
+                char run_path[PATH_MAX];
+                snprintf(run_path, sizeof(run_path), "./%s", out_path);
+                execl(run_path, out_path, (char *)NULL);
+                _exit(127);
+            } else if (run_pid < 0) {
+                run_ret = -1;
+            } else {
+                int run_status;
+                waitpid(run_pid, &run_status, 0);
+                run_ret = WIFEXITED(run_status) ? WEXITSTATUS(run_status) : 1;
+            }
 #endif
             // Clean up temporary binary if no -o was specified
             if (!output)
