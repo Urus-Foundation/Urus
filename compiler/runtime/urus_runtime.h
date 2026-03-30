@@ -320,6 +320,10 @@ static void urus_array_drop(urus_array **ap)
 static void urus_array_push(urus_array *arr, const void *elem)
 {
     if (arr->len >= arr->cap) {
+        if (arr->cap > SIZE_MAX / (2 * arr->elem_size)) {
+            fprintf(stderr, "Error: array too large\n");
+            exit(1);
+        }
         arr->cap *= 2;
         arr->data = urus_realloc(arr->data, arr->elem_size * arr->cap);
     }
