@@ -1,0 +1,201 @@
+__emit__("""
+    #include <time.h>
+
+    static bool _urus_math_seeded = false;
+
+    static void _urus_math_ensure_seed(void) {
+        if (!_urus_math_seeded) {
+            srand((unsigned int)time(NULL));
+            _urus_math_seeded = true;
+        }
+    }
+
+    static double urus_math_sin(double x) { return sin(x); }
+    static double urus_math_cos(double x) { return cos(x); }
+    static double urus_math_tan(double x) { return tan(x); }
+    static double urus_math_asin(double x) { return asin(x); }
+    static double urus_math_acos(double x) { return acos(x); }
+    static double urus_math_atan(double x) { return atan(x); }
+    static double urus_math_atan2(double y, double x) { return atan2(y, x); }
+
+    static double urus_math_log_val(double x) { return log(x); }
+    static double urus_math_log2_val(double x) { return log2(x); }
+    static double urus_math_log10_val(double x) { return log10(x); }
+
+    static double urus_math_ceil(double x) { return ceil(x); }
+    static double urus_math_floor(double x) { return floor(x); }
+    static double urus_math_round(double x) { return round(x); }
+
+    static double urus_math_clamp(double val, double lo, double hi) {
+        return val < lo ? lo : val > hi ? hi : val;
+    }
+
+    static double urus_math_sign(double x) {
+        if (x > 0.0) return 1.0;
+        if (x < 0.0) return -1.0;
+        return 0.0;
+    }
+
+    static double urus_math_lerp(double a, double b, double t) {
+        return a + t * (b - a);
+    }
+
+    static int64_t urus_math_random_int(int64_t min_val, int64_t max_val) {
+        _urus_math_ensure_seed();
+        if (min_val >= max_val) return min_val;
+        return min_val + (int64_t)(rand() % (int)(max_val - min_val + 1));
+    }
+
+    static double urus_math_random_float(void) {
+        _urus_math_ensure_seed();
+        return (double)rand() / (double)RAND_MAX;
+    }
+""");
+
+const MATH_PI: float = 3.14159265358979323846;
+const MATH_E: float = 2.71828182845904523536;
+const MATH_TAU: float = 6.28318530717958647692;
+
+fn math_sin(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_sin(x);
+    """);
+    return result;
+}
+
+fn math_cos(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_cos(x);
+    """);
+    return result;
+}
+
+fn math_tan(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_tan(x);
+    """);
+    return result;
+}
+
+fn math_asin(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_asin(x);
+    """);
+    return result;
+}
+
+fn math_acos(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_acos(x);
+    """);
+    return result;
+}
+
+fn math_atan(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_atan(x);
+    """);
+    return result;
+}
+
+fn math_atan2(y: float, x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_atan2(y, x);
+    """);
+    return result;
+}
+
+fn math_log(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_log_val(x);
+    """);
+    return result;
+}
+
+fn math_log2(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_log2_val(x);
+    """);
+    return result;
+}
+
+fn math_log10(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_log10_val(x);
+    """);
+    return result;
+}
+
+fn math_ceil(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_ceil(x);
+    """);
+    return result;
+}
+
+fn math_floor(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_floor(x);
+    """);
+    return result;
+}
+
+fn math_round(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_round(x);
+    """);
+    return result;
+}
+
+fn math_clamp(val: float, lo: float, hi: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_clamp(val, lo, hi);
+    """);
+    return result;
+}
+
+fn math_sign(x: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_sign(x);
+    """);
+    return result;
+}
+
+fn math_lerp(a: float, b: float, t: float): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_lerp(a, b, t);
+    """);
+    return result;
+}
+
+fn math_random_int(min_val: int, max_val: int): int {
+    let result: int = 0;
+    __emit__("""
+        result = urus_math_random_int(min_val, max_val);
+    """);
+    return result;
+}
+
+fn math_random_float(): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_math_random_float();
+    """);
+    return result;
+}

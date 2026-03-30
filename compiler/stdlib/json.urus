@@ -1,0 +1,329 @@
+__emit__("""
+    /* Skip whitespace */
+    static const char *_json_skip_ws(const char *p) {
+        while (*p == ' ' || *p == '\\t' || *p == '\\n' || *p == '\\r') p++;
+        return p;
+    }
+
+    /* Skip a JSON value (string, number, bool, null, object, array).
+       Returns pointer past the value. */
+    static const char *_json_skip_value(const char *p) {
+        p = _json_skip_ws(p);
+        if (*p == '"') {
+            p++;
+            while (*p && *p != '"') {
+                if (*p == '\\\\') p++;
+                p++;
+            }
+            if (*p == '"') p++;
+            return p;
+        }
+        if (*p == '{' || *p == '[') {
+            char open = *p, close = (*p == '{') ? '}' : ']';
+            int depth = 1;
+            p++;
+            while (*p && depth > 0) {
+                if (*p == '"') {
+                    p++;
+                    while (*p && *p != '"') {
+                        if (*p == '\\\\') p++;
+                        p++;
+                    }
+                    if (*p == '"') p++;
+                    continue;
+                }
+                if (*p == open) depth++;
+                else if (*p == close) depth--;
+                p++;
+            }
+            return p;
+        }
+        /* number, bool, null */
+        while (*p && *p != ',' && *p != '}' && *p != ']' &&
+               *p != ' ' && *p != '\\t' && *p != '\\n' && *p != '\\r') {
+            p++;
+        }
+        return p;
+    }
+
+    /* Find a key in a JSON object string. Returns pointer to the value
+       (after the colon), or NULL if not found. */
+    static const char *_json_find_key(const char *json, const char *key) {
+        const char *p = _json_skip_ws(json);
+        if (*p != '{') return NULL;
+        p++;
+        size_t key_len = strlen(key);
+        while (*p) {
+            p = _json_skip_ws(p);
+            if (*p == '}') return NULL;
+            if (*p == ',') { p++; continue; }
+            /* expect a string key */
+            if (*p != '"') return NULL;
+            p++;
+            const char *ks = p;
+            while (*p && *p != '"') {
+                if (*p == '\\\\') p++;
+                p++;
+            }
+            size_t kl = (size_t)(p - ks);
+            if (*p == '"') p++;
+            p = _json_skip_ws(p);
+            if (*p == ':') p++;
+            p = _json_skip_ws(p);
+            if (kl == key_len && memcmp(ks, key, key_len) == 0) {
+                return p;
+            }
+            /* skip the value */
+            p = _json_skip_value(p);
+        }
+        return NULL;
+    }
+
+    /* Extract a JSON value as a string. For string values, strips quotes.
+       For others, returns raw text. */
+    static urus_str *_json_extract_str(const char *p) {
+        p = _json_skip_ws(p);
+        if (*p == '"') {
+            p++;
+            /* find unescaped closing quote */
+            const char *start = p;
+            size_t cap = 256;
+            size_t len = 0;
+            char *buf = (char *)urus_alloc(cap);
+            while (*p && *p != '"') {
+                char c;
+                if (*p == '\\\\' && *(p + 1)) {
+                    p++;
+                    switch (*p) {
+                        case '"': c = '"'; break;
+                        case '\\\\': c = '\\\\'; break;
+                        case '/': c = '/'; break;
+                        case 'b': c = '\\b'; break;
+                        case 'f': c = '\\f'; break;
+                        case 'n': c = '\\n'; break;
+                        case 'r': c = '\\r'; break;
+                        case 't': c = '\\t'; break;
+                        default: c = *p; break;
+                    }
+                } else {
+                    c = *p;
+                }
+                if (len + 1 >= cap) {
+                    cap *= 2;
+                    buf = (char *)urus_realloc(buf, cap);
+                }
+                buf[len++] = c;
+                p++;
+            }
+            buf[len] = '\\0';
+            urus_str *result = urus_str_new(buf, len);
+            free(buf);
+            return result;
+        }
+        /* non-string value: extract raw text */
+        const char *start = p;
+        const char *end = _json_skip_value(p);
+        return urus_str_new(start, (size_t)(end - start));
+    }
+
+    static urus_str *urus_json_get(urus_str *json_str, urus_str *key) {
+        const char *val = _json_find_key(json_str->data, key->data);
+        if (!val) return urus_str_from("");
+        return _json_extract_str(val);
+    }
+
+    static int64_t urus_json_get_int(urus_str *json_str, urus_str *key) {
+        const char *val = _json_find_key(json_str->data, key->data);
+        if (!val) return 0;
+        return strtoll(val, NULL, 10);
+    }
+
+    static double urus_json_get_float(urus_str *json_str, urus_str *key) {
+        const char *val = _json_find_key(json_str->data, key->data);
+        if (!val) return 0.0;
+        return strtod(val, NULL);
+    }
+
+    static bool urus_json_get_bool(urus_str *json_str, urus_str *key) {
+        const char *val = _json_find_key(json_str->data, key->data);
+        if (!val) return false;
+        val = _json_skip_ws(val);
+        return *val == 't';
+    }
+
+    static urus_array *urus_json_get_array(urus_str *json_str, urus_str *key) {
+        urus_array *arr = urus_array_new(sizeof(urus_str *), 4, (urus_drop_fn)urus_str_drop);
+        const char *val = _json_find_key(json_str->data, key->data);
+        if (!val) return arr;
+        val = _json_skip_ws(val);
+        if (*val != '[') return arr;
+        val++;
+        while (*val) {
+            val = _json_skip_ws(val);
+            if (*val == ']') break;
+            if (*val == ',') { val++; continue; }
+            urus_str *elem = _json_extract_str(val);
+            urus_array_push(arr, &elem);
+            val = _json_skip_value(val);
+        }
+        return arr;
+    }
+
+    static urus_str *urus_json_escape(urus_str *s) {
+        size_t cap = s->len * 2 + 1;
+        char *buf = (char *)urus_alloc(cap);
+        size_t len = 0;
+        for (size_t i = 0; i < s->len; i++) {
+            if (len + 6 >= cap) {
+                cap *= 2;
+                buf = (char *)urus_realloc(buf, cap);
+            }
+            char c = s->data[i];
+            switch (c) {
+                case '"':  buf[len++] = '\\\\'; buf[len++] = '"'; break;
+                case '\\\\': buf[len++] = '\\\\'; buf[len++] = '\\\\'; break;
+                case '\\n': buf[len++] = '\\\\'; buf[len++] = 'n'; break;
+                case '\\r': buf[len++] = '\\\\'; buf[len++] = 'r'; break;
+                case '\\t': buf[len++] = '\\\\'; buf[len++] = 't'; break;
+                case '\\b': buf[len++] = '\\\\'; buf[len++] = 'b'; break;
+                case '\\f': buf[len++] = '\\\\'; buf[len++] = 'f'; break;
+                default:
+                    if ((unsigned char)c < 0x20) {
+                        len += snprintf(buf + len, cap - len, "\\\\u%04x", (unsigned char)c);
+                    } else {
+                        buf[len++] = c;
+                    }
+                    break;
+            }
+        }
+        buf[len] = '\\0';
+        urus_str *result = urus_str_new(buf, len);
+        free(buf);
+        return result;
+    }
+
+    static urus_str *urus_json_object(urus_array *keys, urus_array *values) {
+        size_t cap = 256;
+        char *buf = (char *)urus_alloc(cap);
+        size_t len = 0;
+        buf[len++] = '{';
+        size_t count = keys->len < values->len ? keys->len : values->len;
+        for (size_t i = 0; i < count; i++) {
+            urus_str *k = *(urus_str **)((char *)keys->data + i * keys->elem_size);
+            urus_str *v = *(urus_str **)((char *)values->data + i * values->elem_size);
+            /* need: ,"key":"value" */
+            size_t need = (i > 0 ? 1 : 0) + 1 + k->len + 3 + v->len + 1 + 1;
+            while (len + need >= cap) {
+                cap *= 2;
+                buf = (char *)urus_realloc(buf, cap);
+            }
+            if (i > 0) buf[len++] = ',';
+            buf[len++] = '"';
+            memcpy(buf + len, k->data, k->len); len += k->len;
+            buf[len++] = '"'; buf[len++] = ':'; buf[len++] = '"';
+            memcpy(buf + len, v->data, v->len); len += v->len;
+            buf[len++] = '"';
+        }
+        if (len + 2 >= cap) {
+            cap *= 2;
+            buf = (char *)urus_realloc(buf, cap);
+        }
+        buf[len++] = '}';
+        buf[len] = '\\0';
+        urus_str *result = urus_str_new(buf, len);
+        free(buf);
+        return result;
+    }
+
+    static urus_str *urus_json_array(urus_array *values) {
+        size_t cap = 256;
+        char *buf = (char *)urus_alloc(cap);
+        size_t len = 0;
+        buf[len++] = '[';
+        for (size_t i = 0; i < values->len; i++) {
+            urus_str *v = *(urus_str **)((char *)values->data + i * values->elem_size);
+            size_t need = (i > 0 ? 1 : 0) + 1 + v->len + 1 + 1;
+            while (len + need >= cap) {
+                cap *= 2;
+                buf = (char *)urus_realloc(buf, cap);
+            }
+            if (i > 0) buf[len++] = ',';
+            buf[len++] = '"';
+            memcpy(buf + len, v->data, v->len); len += v->len;
+            buf[len++] = '"';
+        }
+        if (len + 2 >= cap) {
+            cap *= 2;
+            buf = (char *)urus_realloc(buf, cap);
+        }
+        buf[len++] = ']';
+        buf[len] = '\\0';
+        urus_str *result = urus_str_new(buf, len);
+        free(buf);
+        return result;
+    }
+""");
+
+fn json_get(json_str: str, key: str): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_json_get(json_str, key);
+    """);
+    return result;
+}
+
+fn json_get_int(json_str: str, key: str): int {
+    let result: int = 0;
+    __emit__("""
+        result = urus_json_get_int(json_str, key);
+    """);
+    return result;
+}
+
+fn json_get_float(json_str: str, key: str): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_json_get_float(json_str, key);
+    """);
+    return result;
+}
+
+fn json_get_bool(json_str: str, key: str): bool {
+    let result: bool = false;
+    __emit__("""
+        result = urus_json_get_bool(json_str, key);
+    """);
+    return result;
+}
+
+fn json_get_array(json_str: str, key: str): [str] {
+    let result: [str] = [""];
+    __emit__("""
+        result = urus_json_get_array(json_str, key);
+    """);
+    return result;
+}
+
+fn json_object(keys: [str], values: [str]): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_json_object(keys, values);
+    """);
+    return result;
+}
+
+fn json_array(values: [str]): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_json_array(values);
+    """);
+    return result;
+}
+
+fn json_escape(s: str): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_json_escape(s);
+    """);
+    return result;
+}

@@ -58,11 +58,15 @@ void get_local_libpath(char *out, size_t size)
 {
 
 #if defined(_WIN32)
-    // Windows, check registry or fallback to default
-    const char *drive = getenv("SystemDrive");
-    if (!drive)
-        drive = "C:";
-    snprintf(out, size, "%s\\Program Files\\Urusc\\Lib", drive);
+    const char *prefix = getenv("URUSCPATH");
+    if (prefix) {
+        snprintf(out, size, "%s", prefix);
+    } else {
+        const char *drive = getenv("SystemDrive");
+        if (!drive)
+            drive = "C:";
+        snprintf(out, size, "%s\\Program Files\\Urusc\\Lib", drive);
+    }
 
 #elif defined(__ANDROID__)
     // Android / Termux

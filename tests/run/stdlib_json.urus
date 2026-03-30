@@ -1,0 +1,19 @@
+import json;
+
+let data: str = "{\"name\":\"Urus\",\"version\":3,\"active\":true,\"tags\":[\"lang\",\"compiler\"]}";
+println(json_get(data, "name"));
+println(json_get_int(data, "version"));
+println(json_get_bool(data, "active"));
+
+let tags: [str] = json_get_array(data, "tags");
+println(tags[0]);
+println(tags[1]);
+
+let keys: [str] = ["lang", "year"];
+let vals: [str] = ["urus", "2026"];
+println(json_object(keys, vals));
+
+let items: [str] = ["one", "two", "three"];
+println(json_array(items));
+
+println(json_escape("hello \"world\"\nnewline"));

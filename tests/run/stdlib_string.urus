@@ -1,0 +1,12 @@
+import string;
+
+println(str_repeat("ab", 3));
+println(str_pad_left("hi", 6, "0"));
+println(str_pad_right("hi", 6, "."));
+println(str_reverse("hello"));
+println(str_count("banana", "an"));
+let parts: [str] = ["a", "b", "c"];
+println(str_join(parts, "-"));
+println(str_is_empty(""));
+println(str_is_numeric("123.45"));
+println(str_is_alpha("hello"));
