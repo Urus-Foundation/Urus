@@ -1,0 +1,180 @@
+__emit__("""
+    #include <sys/stat.h>
+
+    #ifdef _WIN32
+    #include <windows.h>
+    #include <direct.h>
+    #else
+    #include <dirent.h>
+    #include <unistd.h>
+    #endif
+
+    static bool urus_fs_file_exists(urus_str *path) {
+        #ifdef _WIN32
+        DWORD attr = GetFileAttributesA(path->data);
+        return attr != INVALID_FILE_ATTRIBUTES;
+        #else
+        struct stat st;
+        return stat(path->data, &st) == 0;
+        #endif
+    }
+
+    static bool urus_fs_is_file(urus_str *path) {
+        #ifdef _WIN32
+        DWORD attr = GetFileAttributesA(path->data);
+        return attr != INVALID_FILE_ATTRIBUTES && !(attr & FILE_ATTRIBUTE_DIRECTORY);
+        #else
+        struct stat st;
+        if (stat(path->data, &st) != 0) return false;
+        return S_ISREG(st.st_mode);
+        #endif
+    }
+
+    static bool urus_fs_is_dir(urus_str *path) {
+        #ifdef _WIN32
+        DWORD attr = GetFileAttributesA(path->data);
+        return attr != INVALID_FILE_ATTRIBUTES && (attr & FILE_ATTRIBUTE_DIRECTORY);
+        #else
+        struct stat st;
+        if (stat(path->data, &st) != 0) return false;
+        return S_ISDIR(st.st_mode);
+        #endif
+    }
+
+    static int64_t urus_fs_file_size(urus_str *path) {
+        FILE *f = fopen(path->data, "rb");
+        if (!f) return -1;
+        fseek(f, 0, SEEK_END);
+        long size = ftell(f);
+        fclose(f);
+        return (int64_t)size;
+    }
+
+    static bool urus_fs_delete_file(urus_str *path) {
+        return remove(path->data) == 0;
+    }
+
+    static bool urus_fs_rename_file(urus_str *old_path, urus_str *new_path) {
+        return rename(old_path->data, new_path->data) == 0;
+    }
+
+    static urus_array *urus_fs_list_dir(urus_str *path) {
+        urus_array *arr = urus_array_new(sizeof(urus_str *), 8, (urus_drop_fn)urus_str_drop);
+        #ifdef _WIN32
+        char search_path[MAX_PATH];
+        snprintf(search_path, MAX_PATH, "%s\\*", path->data);
+        WIN32_FIND_DATAA fd;
+        HANDLE h = FindFirstFileA(search_path, &fd);
+        if (h == INVALID_HANDLE_VALUE) return arr;
+        do {
+            if (strcmp(fd.cFileName, ".") == 0 || strcmp(fd.cFileName, "..") == 0) continue;
+            urus_str *name = urus_str_from(fd.cFileName);
+            urus_array_push(arr, &name);
+        } while (FindNextFileA(h, &fd));
+        FindClose(h);
+        #else
+        DIR *d = opendir(path->data);
+        if (!d) return arr;
+        struct dirent *ent;
+        while ((ent = readdir(d)) != NULL) {
+            if (strcmp(ent->d_name, ".") == 0 || strcmp(ent->d_name, "..") == 0) continue;
+            urus_str *name = urus_str_from(ent->d_name);
+            urus_array_push(arr, &name);
+        }
+        closedir(d);
+        #endif
+        return arr;
+    }
+
+    static bool urus_fs_mkdir(urus_str *path) {
+        #ifdef _WIN32
+        return CreateDirectoryA(path->data, NULL) != 0;
+        #else
+        return mkdir(path->data, 0755) == 0;
+        #endif
+    }
+
+    static urus_str *urus_fs_cwd(void) {
+        char buf[4096];
+        #ifdef _WIN32
+        DWORD len = GetCurrentDirectoryA(sizeof(buf), buf);
+        if (len == 0) return urus_str_from("");
+        return urus_str_new(buf, (size_t)len);
+        #else
+        if (getcwd(buf, sizeof(buf)) == NULL) return urus_str_from("");
+        return urus_str_from(buf);
+        #endif
+    }
+""");
+
+fn fs_file_exists(path: str): bool {
+    let result: bool = false;
+    __emit__("""
+        result = urus_fs_file_exists(path);
+    """);
+    return result;
+}
+
+fn fs_is_file(path: str): bool {
+    let result: bool = false;
+    __emit__("""
+        result = urus_fs_is_file(path);
+    """);
+    return result;
+}
+
+fn fs_is_dir(path: str): bool {
+    let result: bool = false;
+    __emit__("""
+        result = urus_fs_is_dir(path);
+    """);
+    return result;
+}
+
+fn fs_file_size(path: str): int {
+    let result: int = 0;
+    __emit__("""
+        result = urus_fs_file_size(path);
+    """);
+    return result;
+}
+
+fn fs_delete_file(path: str): bool {
+    let result: bool = false;
+    __emit__("""
+        result = urus_fs_delete_file(path);
+    """);
+    return result;
+}
+
+fn fs_rename_file(old_path: str, new_path: str): bool {
+    let result: bool = false;
+    __emit__("""
+        result = urus_fs_rename_file(old_path, new_path);
+    """);
+    return result;
+}
+
+fn fs_list_dir(path: str): [str] {
+    let result: [str] = [""];
+    __emit__("""
+        result = urus_fs_list_dir(path);
+    """);
+    return result;
+}
+
+fn fs_mkdir(path: str): bool {
+    let result: bool = false;
+    __emit__("""
+        result = urus_fs_mkdir(path);
+    """);
+    return result;
+}
+
+fn fs_cwd(): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_fs_cwd();
+    """);
+    return result;
+}

@@ -1,0 +1,11 @@
+import math;
+
+println(math_sin(0.0));
+println(math_cos(0.0));
+println(math_floor(3.7));
+println(math_ceil(3.2));
+println(math_round(3.5));
+println(math_clamp(10.0, 0.0, 5.0));
+println(math_sign(-42.0));
+println(math_lerp(0.0, 10.0, 0.5));
+println(MATH_PI);

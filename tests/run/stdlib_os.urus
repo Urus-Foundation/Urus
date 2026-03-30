@@ -1,0 +1,6 @@
+import os;
+
+println(os_name());
+println(os_arch());
+let t: float = os_clock();
+println(t >= 0.0);

@@ -1,0 +1,200 @@
+__emit__("""
+    #include <time.h>
+
+    #ifdef _WIN32
+    #include <windows.h>
+    #else
+    #include <unistd.h>
+    #endif
+
+    static urus_str *urus_os_env_get(urus_str *name) {
+        const char *val = getenv(name->data);
+        if (val == NULL) return urus_str_from("");
+        return urus_str_from(val);
+    }
+
+    static void urus_os_env_set(urus_str *name, urus_str *value) {
+        #ifdef _WIN32
+        _putenv_s(name->data, value->data);
+        #else
+        setenv(name->data, value->data, 1);
+        #endif
+    }
+
+    static urus_str *urus_os_name(void) {
+        #ifdef _WIN32
+        return urus_str_from("windows");
+        #elif defined(__APPLE__)
+        return urus_str_from("macos");
+        #elif defined(__linux__)
+        return urus_str_from("linux");
+        #elif defined(__ANDROID__)
+        return urus_str_from("android");
+        #else
+        return urus_str_from("unknown");
+        #endif
+    }
+
+    static urus_str *urus_os_arch(void) {
+        #if defined(__x86_64__) || defined(_M_X64)
+        return urus_str_from("x86_64");
+        #elif defined(__aarch64__) || defined(_M_ARM64)
+        return urus_str_from("arm64");
+        #elif defined(__i386__) || defined(_M_IX86)
+        return urus_str_from("x86");
+        #elif defined(__arm__) || defined(_M_ARM)
+        return urus_str_from("arm");
+        #else
+        return urus_str_from("unknown");
+        #endif
+    }
+
+    static urus_str *urus_os_exec(urus_str *cmd) {
+        #ifdef _WIN32
+        FILE *fp = _popen(cmd->data, "r");
+        #else
+        FILE *fp = popen(cmd->data, "r");
+        #endif
+        if (!fp) {
+            fprintf(stderr, "Error: failed to execute command\\n");
+            return urus_str_from("");
+        }
+        size_t cap = 4096;
+        size_t len = 0;
+        char *buf = (char *)urus_alloc(cap);
+        size_t n;
+        while ((n = fread(buf + len, 1, cap - len - 1, fp)) > 0) {
+            len += n;
+            if (len + 1 >= cap) {
+                cap *= 2;
+                buf = (char *)urus_realloc(buf, cap);
+            }
+        }
+        #ifdef _WIN32
+        _pclose(fp);
+        #else
+        pclose(fp);
+        #endif
+        buf[len] = '\0';
+        urus_str *result = urus_str_new(buf, len);
+        free(buf);
+        return result;
+    }
+
+    static void urus_os_exit(int64_t code) {
+        exit((int)code);
+    }
+
+    static urus_array *urus_os_args(void) {
+        urus_array *arr = urus_array_new(sizeof(urus_str *), 4, (urus_drop_fn)urus_str_drop);
+        #ifdef _WIN32
+        extern int __argc;
+        extern char **__argv;
+        for (int i = 0; i < __argc; i++) {
+            urus_str *s = urus_str_from(__argv[i]);
+            urus_array_push(arr, &s);
+        }
+        #elif defined(__linux__)
+        FILE *f = fopen("/proc/self/cmdline", "rb");
+        if (f) {
+            char buf[4096];
+            size_t n = fread(buf, 1, sizeof(buf) - 1, f);
+            fclose(f);
+            buf[n] = '\0';
+            size_t i = 0;
+            while (i < n) {
+                urus_str *s = urus_str_from(buf + i);
+                urus_array_push(arr, &s);
+                i += strlen(buf + i) + 1;
+            }
+        }
+        #elif defined(__APPLE__)
+        #include <crt_externs.h>
+        int argc = *_NSGetArgc();
+        char **argv = *_NSGetArgv();
+        for (int i = 0; i < argc; i++) {
+            urus_str *s = urus_str_from(argv[i]);
+            urus_array_push(arr, &s);
+        }
+        #endif
+        return arr;
+    }
+
+    static double urus_os_clock(void) {
+        return (double)clock() / (double)CLOCKS_PER_SEC;
+    }
+
+    static void urus_os_sleep_ms(int64_t ms) {
+        #ifdef _WIN32
+        Sleep((DWORD)ms);
+        #else
+        usleep((useconds_t)(ms * 1000));
+        #endif
+    }
+""");
+
+fn os_env_get(name: str): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_os_env_get(name);
+    """);
+    return result;
+}
+
+fn os_env_set(name: str, value: str): void {
+    __emit__("""
+        urus_os_env_set(name, value);
+    """);
+}
+
+fn os_name(): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_os_name();
+    """);
+    return result;
+}
+
+fn os_arch(): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_os_arch();
+    """);
+    return result;
+}
+
+fn os_exec(cmd: str): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_os_exec(cmd);
+    """);
+    return result;
+}
+
+fn os_exit(code: int): void {
+    __emit__("""
+        urus_os_exit(code);
+    """);
+}
+
+fn os_args(): [str] {
+    let result: [str] = [""];
+    __emit__("""
+        result = urus_os_args();
+    """);
+    return result;
+}
+
+fn os_clock(): float {
+    let result: float = 0.0;
+    __emit__("""
+        result = urus_os_clock();
+    """);
+    return result;
+}
+
+fn os_sleep_ms(ms: int): void {
+    __emit__("""
+        urus_os_sleep_ms(ms);
+    """);
+}

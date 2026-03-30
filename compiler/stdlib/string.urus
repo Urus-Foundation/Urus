@@ -1,0 +1,203 @@
+__emit__("""
+    static urus_str *urus_str_repeat(urus_str *s, int64_t n) {
+        if (n <= 0 || s->len == 0) return urus_str_from("");
+        size_t total = s->len * (size_t)n;
+        char *buf = (char *)urus_alloc(total + 1);
+        for (int64_t i = 0; i < n; i++) {
+            memcpy(buf + i * s->len, s->data, s->len);
+        }
+        buf[total] = '\0';
+        urus_str *result = urus_str_new(buf, total);
+        free(buf);
+        return result;
+    }
+
+    static urus_str *urus_str_pad_left(urus_str *s, int64_t width, urus_str *pad_char) {
+        if ((int64_t)s->len >= width) return urus_str_new(s->data, s->len);
+        size_t pad_len = (size_t)(width - (int64_t)s->len);
+        char *buf = (char *)urus_alloc((size_t)width + 1);
+        char pc = (pad_char->len > 0) ? pad_char->data[0] : ' ';
+        memset(buf, pc, pad_len);
+        memcpy(buf + pad_len, s->data, s->len);
+        buf[width] = '\0';
+        urus_str *result = urus_str_new(buf, (size_t)width);
+        free(buf);
+        return result;
+    }
+
+    static urus_str *urus_str_pad_right(urus_str *s, int64_t width, urus_str *pad_char) {
+        if ((int64_t)s->len >= width) return urus_str_new(s->data, s->len);
+        size_t pad_len = (size_t)(width - (int64_t)s->len);
+        char *buf = (char *)urus_alloc((size_t)width + 1);
+        memcpy(buf, s->data, s->len);
+        char pc = (pad_char->len > 0) ? pad_char->data[0] : ' ';
+        memset(buf + s->len, pc, pad_len);
+        buf[width] = '\0';
+        urus_str *result = urus_str_new(buf, (size_t)width);
+        free(buf);
+        return result;
+    }
+
+    static urus_str *urus_str_reverse_str(urus_str *s) {
+        char *buf = (char *)urus_alloc(s->len + 1);
+        for (size_t i = 0; i < s->len; i++) {
+            buf[i] = s->data[s->len - 1 - i];
+        }
+        buf[s->len] = '\0';
+        urus_str *result = urus_str_new(buf, s->len);
+        free(buf);
+        return result;
+    }
+
+    static int64_t urus_str_count(urus_str *s, urus_str *substr) {
+        if (substr->len == 0 || s->len == 0) return 0;
+        int64_t count = 0;
+        const char *p = s->data;
+        while ((p = strstr(p, substr->data)) != NULL) {
+            count++;
+            p += substr->len;
+        }
+        return count;
+    }
+
+    static urus_str *urus_str_join(urus_array *arr, urus_str *sep) {
+        if (arr->len == 0) return urus_str_from("");
+        size_t total = 0;
+        for (size_t i = 0; i < arr->len; i++) {
+            urus_str *elem = *(urus_str **)((char *)arr->data + i * arr->elem_size);
+            total += elem->len;
+            if (i > 0) total += sep->len;
+        }
+        char *buf = (char *)urus_alloc(total + 1);
+        size_t pos = 0;
+        for (size_t i = 0; i < arr->len; i++) {
+            if (i > 0 && sep->len > 0) {
+                memcpy(buf + pos, sep->data, sep->len);
+                pos += sep->len;
+            }
+            urus_str *elem = *(urus_str **)((char *)arr->data + i * arr->elem_size);
+            memcpy(buf + pos, elem->data, elem->len);
+            pos += elem->len;
+        }
+        buf[total] = '\0';
+        urus_str *result = urus_str_new(buf, total);
+        free(buf);
+        return result;
+    }
+
+    static urus_array *urus_str_chars(urus_str *s) {
+        urus_array *arr = urus_array_new(sizeof(urus_str *), s->len > 0 ? s->len : 1, (urus_drop_fn)urus_str_drop);
+        for (size_t i = 0; i < s->len; i++) {
+            urus_str *c = urus_str_new(s->data + i, 1);
+            urus_array_push(arr, &c);
+        }
+        return arr;
+    }
+
+    static bool urus_str_is_empty(urus_str *s) {
+        return s->len == 0;
+    }
+
+    static bool urus_str_is_numeric(urus_str *s) {
+        if (s->len == 0) return false;
+        size_t start = 0;
+        bool has_dot = false;
+        if (s->data[0] == '-' && s->len > 1) start = 1;
+        for (size_t i = start; i < s->len; i++) {
+            if (s->data[i] == '.' && !has_dot) {
+                has_dot = true;
+                continue;
+            }
+            if (!isdigit((unsigned char)s->data[i])) return false;
+        }
+        return true;
+    }
+
+    static bool urus_str_is_alpha(urus_str *s) {
+        if (s->len == 0) return false;
+        for (size_t i = 0; i < s->len; i++) {
+            if (!isalpha((unsigned char)s->data[i])) return false;
+        }
+        return true;
+    }
+""");
+
+fn str_repeat(s: str, n: int): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_str_repeat(s, n);
+    """);
+    return result;
+}
+
+fn str_pad_left(s: str, width: int, pad_char: str): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_str_pad_left(s, width, pad_char);
+    """);
+    return result;
+}
+
+fn str_pad_right(s: str, width: int, pad_char: str): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_str_pad_right(s, width, pad_char);
+    """);
+    return result;
+}
+
+fn str_reverse(s: str): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_str_reverse_str(s);
+    """);
+    return result;
+}
+
+fn str_count(s: str, substr: str): int {
+    let result: int = 0;
+    __emit__("""
+        result = urus_str_count(s, substr);
+    """);
+    return result;
+}
+
+fn str_join(arr: [str], sep: str): str {
+    let result: str = "";
+    __emit__("""
+        result = urus_str_join(arr, sep);
+    """);
+    return result;
+}
+
+fn str_chars(s: str): [str] {
+    let result: [str] = [""];
+    __emit__("""
+        result = urus_str_chars(s);
+    """);
+    return result;
+}
+
+fn str_is_empty(s: str): bool {
+    let result: bool = false;
+    __emit__("""
+        result = urus_str_is_empty(s);
+    """);
+    return result;
+}
+
+fn str_is_numeric(s: str): bool {
+    let result: bool = false;
+    __emit__("""
+        result = urus_str_is_numeric(s);
+    """);
+    return result;
+}
+
+fn str_is_alpha(s: str): bool {
+    let result: bool = false;
+    __emit__("""
+        result = urus_str_is_alpha(s);
+    """);
+    return result;
+}

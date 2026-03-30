@@ -1,0 +1,7 @@
+import fs;
+
+println(fs_cwd());
+println(fs_file_exists("tests/run/stdlib_fs.urus"));
+println(fs_is_file("tests/run/stdlib_fs.urus"));
+println(fs_is_dir("tests"));
+println(fs_file_size("tests/run/stdlib_fs.urus"));
