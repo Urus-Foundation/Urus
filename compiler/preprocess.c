@@ -107,8 +107,9 @@ static char *resolve_stdlib_path(const char *module_name)
     size_t base_len = strlen(urus_path);
     size_t name_len = strlen(module_name);
     // +1 for sep, +5 for ".urus", +1 for '\0'
-    char *full = xmalloc(base_len + 1 + name_len + 5 + 1);
-    sprintf(full, "%s%c%s.urus", urus_path, URUSC_PATHSEP, module_name);
+    size_t total = base_len + 1 + name_len + 5 + 1;
+    char *full = xmalloc(total);
+    snprintf(full, total, "%s%c%s.urus", urus_path, URUSC_PATHSEP, module_name);
 
     return full;
 }
