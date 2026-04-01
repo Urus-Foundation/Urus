@@ -211,6 +211,27 @@ static AstType *parse_type(Parser *p)
         expect(p, TOK_RPAREN, "expected ')' after tuple type");
         return ast_type_tuple(elems, count);
     }
+    // Function type: fn(T1, T2): R
+    if (match(p, TOK_FN)) {
+        expect(p, TOK_LPAREN, "expected '(' in function type");
+        int cap = 4, count = 0;
+        AstType **ptypes = xmalloc(sizeof(AstType *) * (size_t)cap);
+        if (!check(p, TOK_RPAREN)) {
+            do {
+                if (count >= cap) {
+                    cap *= 2;
+                    ptypes = xrealloc(ptypes, sizeof(AstType *) * (size_t)cap);
+                }
+                ptypes[count++] = parse_type(p);
+            } while (match(p, TOK_COMMA));
+        }
+        expect(p, TOK_RPAREN, "expected ')' in function type");
+        AstType *ret = ast_type_simple(TYPE_VOID);
+        if (match(p, TOK_COLON)) {
+            ret = parse_type(p);
+        }
+        return ast_type_fn(ptypes, count, ret);
+    }
     // Result<T, E>
     if (check(p, TOK_IDENT)) {
         Token t = current(p);
@@ -831,6 +852,46 @@ static AstNode *parse_primary(Parser *p)
         n->as.if_expr.condition = cond;
         n->as.if_expr.then_expr = then_expr;
         n->as.if_expr.else_expr = else_expr;
+        return n;
+    }
+
+    // Lambda: |params| { body } or |params| -> type { body }
+    if (match(p, TOK_PIPE)) {
+        static int lambda_counter = 0;
+        int cap = 4, count = 0;
+        Param *params = xmalloc(sizeof(Param) * (size_t)cap);
+        if (!check(p, TOK_PIPE)) {
+            do {
+                if (count >= cap) {
+                    cap *= 2;
+                    params = xrealloc(params, sizeof(Param) * (size_t)cap);
+                }
+                Token pname = expect(p, TOK_IDENT, "expected parameter name");
+                expect(p, TOK_COLON, "expected ':' after lambda parameter name");
+                AstType *ptype = parse_type(p);
+                params[count].name = tok_str(pname);
+                params[count].type = ptype;
+                params[count].is_mut = false;
+                params[count].tok = pname;
+                params[count].default_value = NULL;
+                count++;
+            } while (match(p, TOK_COMMA));
+        }
+        expect(p, TOK_PIPE, "expected '|' after lambda parameters");
+        AstType *ret = ast_type_simple(TYPE_VOID);
+        if (match(p, TOK_COLON)) {
+            ret = parse_type(p);
+        }
+        AstNode *body = parse_block(p);
+        AstNode *n = ast_new(NODE_LAMBDA, t);
+        n->as.lambda.params = params;
+        n->as.lambda.param_count = count;
+        n->as.lambda.return_type = ret;
+        n->as.lambda.body = body;
+        n->as.lambda.captures = NULL;
+        n->as.lambda.capture_types = NULL;
+        n->as.lambda.capture_count = 0;
+        n->as.lambda.lambda_id = lambda_counter++;
         return n;
     }
 

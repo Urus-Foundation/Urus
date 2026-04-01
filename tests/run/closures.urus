@@ -1,0 +1,19 @@
+fn apply(f: fn(int): int, x: int): int {
+    return f(x);
+}
+
+fn main(): void {
+    let twice: fn(int): int = |n: int|: int {
+        return n * 2;
+    };
+
+    let result: int = twice(5);
+    print(result);
+
+    let add_one: fn(int): int = |n: int|: int {
+        return n + 1;
+    };
+
+    let r2: int = apply(add_one, 10);
+    print(r2);
+}

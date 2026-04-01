@@ -131,6 +131,98 @@ static AstNode *find_generic_fn(AstNode *program, const char *name)
 // Stored program root for generic fn lookup during codegen
 static AstNode *_codegen_program = NULL;
 
+// ---- Lambda tracking ----
+
+#define MAX_LAMBDAS 256
+static AstNode *lambda_nodes[MAX_LAMBDAS];
+static int lambda_count = 0;
+
+static void collect_lambdas(AstNode *node)
+{
+    if (!node) return;
+    if (node->kind == NODE_LAMBDA) {
+        if (lambda_count < MAX_LAMBDAS)
+            lambda_nodes[lambda_count++] = node;
+        // Also collect from lambda body
+        collect_lambdas(node->as.lambda.body);
+        return;
+    }
+    // Walk all child nodes
+    switch (node->kind) {
+    case NODE_PROGRAM:
+        for (int i = 0; i < node->as.program.decl_count; i++)
+            collect_lambdas(node->as.program.decls[i]);
+        break;
+    case NODE_FN_DECL:
+        collect_lambdas(node->as.fn_decl.body);
+        break;
+    case NODE_BLOCK:
+        for (int i = 0; i < node->as.block.stmt_count; i++)
+            collect_lambdas(node->as.block.stmts[i]);
+        break;
+    case NODE_LET_STMT:
+        collect_lambdas(node->as.let_stmt.init);
+        break;
+    case NODE_ASSIGN_STMT:
+        collect_lambdas(node->as.assign_stmt.value);
+        break;
+    case NODE_RETURN_STMT:
+        collect_lambdas(node->as.return_stmt.value);
+        break;
+    case NODE_IF_STMT:
+        collect_lambdas(node->as.if_stmt.condition);
+        collect_lambdas(node->as.if_stmt.then_block);
+        collect_lambdas(node->as.if_stmt.else_branch);
+        break;
+    case NODE_WHILE_STMT:
+        collect_lambdas(node->as.while_stmt.condition);
+        collect_lambdas(node->as.while_stmt.body);
+        break;
+    case NODE_FOR_STMT:
+        collect_lambdas(node->as.for_stmt.iterable);
+        collect_lambdas(node->as.for_stmt.body);
+        break;
+    case NODE_CALL:
+        collect_lambdas(node->as.call.callee);
+        for (int i = 0; i < node->as.call.arg_count; i++)
+            collect_lambdas(node->as.call.args[i]);
+        break;
+    case NODE_BINARY:
+        collect_lambdas(node->as.binary.left);
+        collect_lambdas(node->as.binary.right);
+        break;
+    case NODE_UNARY:
+        collect_lambdas(node->as.unary.operand);
+        break;
+    case NODE_EXPR_STMT:
+        collect_lambdas(node->as.expr_stmt.expr);
+        break;
+    case NODE_IMPL_BLOCK:
+        for (int i = 0; i < node->as.impl_block.method_count; i++)
+            collect_lambdas(node->as.impl_block.methods[i]);
+        break;
+    default:
+        break;
+    }
+}
+
+static void gen_lambda_fn(CodeBuf *buf, AstNode *node)
+{
+    // Generate: static ReturnType _urus_lambda_N(Params...) { body }
+    gen_type(buf, node->as.lambda.return_type);
+    emit(buf, " _urus_lambda_%d(", node->as.lambda.lambda_id);
+    if (node->as.lambda.param_count == 0) {
+        emit(buf, "void");
+    } else {
+        for (int i = 0; i < node->as.lambda.param_count; i++) {
+            if (i > 0) emit(buf, ", ");
+            gen_type(buf, node->as.lambda.params[i].type);
+            emit(buf, " %s", node->as.lambda.params[i].name);
+        }
+    }
+    emit(buf, ")");
+}
+
 // ---- Tuple typedef tracking ----
 static bool tuple_needs_drop(AstType *t);
 static bool type_needs_drop(AstType *t);
@@ -848,6 +940,24 @@ static void gen_expr(CodeBuf *buf, AstNode *node)
                     fn_name, node->as.call.type_args,
                     node->as.call.type_arg_count, gen_fn);
                 emit(buf, "%s(", mangled);
+            } else if (node->as.call.callee->resolved_type &&
+                       node->as.call.callee->resolved_type->kind == TYPE_FN) {
+                // Calling a function pointer variable — cast void* to proper fn ptr
+                AstType *ft = node->as.call.callee->resolved_type;
+                emit(buf, "((");
+                gen_type(buf, ft->return_type);
+                emit(buf, "(*)(");
+                if (ft->param_count == 0) {
+                    emit(buf, "void");
+                } else {
+                    for (int i = 0; i < ft->param_count; i++) {
+                        if (i > 0) emit(buf, ", ");
+                        gen_type(buf, ft->param_types[i]);
+                    }
+                }
+                emit(buf, "))");
+                gen_expr(buf, node->as.call.callee);
+                emit(buf, ")(");
             } else {
                 gen_expr(buf, node->as.call.callee);
                 emit(buf, "(");
@@ -900,6 +1010,10 @@ static void gen_expr(CodeBuf *buf, AstNode *node)
         emit(buf, " : ");
         gen_expr(buf, node->as.if_expr.else_expr);
         emit(buf, ")");
+        break;
+    case NODE_LAMBDA:
+        // Lambda becomes a function pointer cast to void*
+        emit(buf, "(void*)_urus_lambda_%d", node->as.lambda.lambda_id);
         break;
     default:
         emit(buf, "/* unsupported expr */0");
@@ -1891,6 +2005,22 @@ void codegen_generate(CodeBuf *buf, AstNode *program)
                       "    }\n"
                       "}\n\n");
         }
+    }
+
+    // Pass 3F: collect and emit lambda functions
+    lambda_count = 0;
+    collect_lambdas(program);
+    for (int i = 0; i < lambda_count; i++) {
+        // Forward declaration
+        gen_lambda_fn(buf, lambda_nodes[i]);
+        emit(buf, ";\n");
+    }
+    emit(buf, "\n");
+    for (int i = 0; i < lambda_count; i++) {
+        gen_lambda_fn(buf, lambda_nodes[i]);
+        emit(buf, " ");
+        gen_block(buf, lambda_nodes[i]->as.lambda.body);
+        emit(buf, "\n");
     }
 
     // Pass 4: function definitions (skip generic templates)
