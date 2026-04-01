@@ -105,6 +105,7 @@ typedef enum {
     TYPE_RESULT, // Result<ok_type, err_type>
     TYPE_FN, // fn(T1, T2) -> R
     TYPE_TUPLE, // (T1, T2, ...)
+    TYPE_GENERIC, // generic type parameter (T, U, etc.)
 } TypeKind;
 
 struct AstType {
@@ -226,6 +227,9 @@ struct AstNode {
             int param_count;
             AstType *return_type;
             AstNode *body; // block
+            // Generics
+            char **generic_params; // e.g. ["T", "U"]
+            int generic_param_count;
         } fn_decl;
 
         // NODE_STRUCT_DECL
@@ -233,6 +237,9 @@ struct AstNode {
             char *name;
             Param *fields;
             int field_count;
+            // Generics
+            char **generic_params; // e.g. ["T"]
+            int generic_param_count;
         } struct_decl;
 
         // NODE_BLOCK
@@ -340,6 +347,9 @@ struct AstNode {
             AstNode *callee;
             AstNode **args;
             int arg_count;
+            // Generics: explicit type arguments e.g. max<int>(a, b)
+            AstType **type_args;
+            int type_arg_count;
         } call;
 
         // NODE_FIELD_ACCESS
@@ -391,6 +401,9 @@ struct AstNode {
             FieldInit *fields;
             int field_count;
             AstNode *spread;
+            // Generics: type arguments e.g. Pair<int, str> { ... }
+            AstType **type_args;
+            int type_arg_count;
         } struct_lit;
 
         // NODE_ENUM_DECL
@@ -487,6 +500,11 @@ AstType *ast_type_result(AstType *ok_type, AstType *err_type);
 AstType *ast_type_fn(AstType **param_types, int param_count,
                      AstType *return_type);
 AstType *ast_type_tuple(AstType **elems, int count);
+AstType *ast_type_generic(const char *name);
+
+// Generic type substitution (used by both sema and codegen)
+AstType *sema_substitute_type(AstType *t, char **generic_names,
+                              AstType **concrete_types, int count);
 char *ast_strdup(const char *s, size_t len);
 
 // Type utilities
@@ -565,6 +583,10 @@ typedef struct {
 
     // alias (type ID = int;);
     AstType *alias_type;
+
+    // generics
+    char **generic_params;
+    int generic_param_count;
 } SemaSymbol;
 
 typedef struct Scope {

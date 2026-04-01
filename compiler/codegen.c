@@ -46,6 +46,91 @@ static void emit_defers(CodeBuf *buf)
     }
 }
 
+// ---- Generic monomorphization tracking ----
+
+typedef struct {
+    char *fn_name;           // original generic function name
+    AstType **type_args;     // concrete type arguments
+    int type_arg_count;
+    char *mangled_name;      // mangled C function name
+    AstNode *fn_node;        // original AST node
+} MonoInstance;
+
+#define MAX_MONO 256
+static MonoInstance mono_instances[MAX_MONO];
+static int mono_count = 0;
+
+// Build a mangled name for a generic function instantiation
+static char *mono_mangle_name(const char *fn_name, AstType **type_args,
+                              int type_arg_count)
+{
+    char buf[512];
+    int pos = snprintf(buf, sizeof(buf), "%s", fn_name);
+    for (int i = 0; i < type_arg_count; i++) {
+        pos += snprintf(buf + pos, sizeof(buf) - (size_t)pos, "_%s",
+                        ast_type_str(type_args[i]));
+    }
+    // Sanitize: replace special chars with _
+    for (int i = 0; buf[i]; i++) {
+        if (buf[i] == '<' || buf[i] == '>' || buf[i] == ',' ||
+            buf[i] == ' ' || buf[i] == '*' || buf[i] == '[' || buf[i] == ']' ||
+            buf[i] == '(' || buf[i] == ')')
+            buf[i] = '_';
+    }
+    return strdup(buf);
+}
+
+// Find or register a monomorphization instance. Returns the mangled name.
+static const char *mono_get_or_add(const char *fn_name, AstType **type_args,
+                                    int type_arg_count, AstNode *fn_node)
+{
+    // Check if already exists
+    for (int i = 0; i < mono_count; i++) {
+        if (strcmp(mono_instances[i].fn_name, fn_name) == 0 &&
+            mono_instances[i].type_arg_count == type_arg_count) {
+            bool match = true;
+            for (int j = 0; j < type_arg_count; j++) {
+                if (!ast_types_equal(mono_instances[i].type_args[j],
+                                     type_args[j])) {
+                    match = false;
+                    break;
+                }
+            }
+            if (match) return mono_instances[i].mangled_name;
+        }
+    }
+    // Add new
+    if (mono_count >= MAX_MONO) {
+        fprintf(stderr, "Error: too many generic instantiations (max %d)\n",
+                MAX_MONO);
+        exit(1);
+    }
+    MonoInstance *m = &mono_instances[mono_count++];
+    m->fn_name = strdup(fn_name);
+    m->type_args = type_args;
+    m->type_arg_count = type_arg_count;
+    m->mangled_name = mono_mangle_name(fn_name, type_args, type_arg_count);
+    m->fn_node = fn_node;
+    return m->mangled_name;
+}
+
+// Find the AST node for a generic function by name
+static AstNode *find_generic_fn(AstNode *program, const char *name)
+{
+    for (int i = 0; i < program->as.program.decl_count; i++) {
+        AstNode *d = program->as.program.decls[i];
+        if (d->kind == NODE_FN_DECL &&
+            d->as.fn_decl.generic_param_count > 0 &&
+            strcmp(d->as.fn_decl.name, name) == 0) {
+            return d;
+        }
+    }
+    return NULL;
+}
+
+// Stored program root for generic fn lookup during codegen
+static AstNode *_codegen_program = NULL;
+
 // ---- Tuple typedef tracking ----
 static bool tuple_needs_drop(AstType *t);
 static bool type_needs_drop(AstType *t);
@@ -383,6 +468,10 @@ static void gen_type(CodeBuf *buf, AstType *t)
         break; // function pointers as void*
     case TYPE_TUPLE:
         emit(buf, "%s", tuple_type_name(t));
+        break;
+    case TYPE_GENERIC:
+        // Should not appear in final codegen (substituted during monomorphization)
+        emit(buf, "/* generic %s */ void*", t->name);
         break;
     }
 }
@@ -750,6 +839,15 @@ static void gen_expr(CodeBuf *buf, AstNode *node)
             }
             if (c_name) {
                 emit(buf, "%s(", c_name);
+            } else if (fn_name && node->as.call.type_arg_count > 0 &&
+                       node->as.call.type_args) {
+                // Generic function call — use monomorphized name
+                AstNode *gen_fn = _codegen_program
+                    ? find_generic_fn(_codegen_program, fn_name) : NULL;
+                const char *mangled = mono_get_or_add(
+                    fn_name, node->as.call.type_args,
+                    node->as.call.type_arg_count, gen_fn);
+                emit(buf, "%s(", mangled);
             } else {
                 gen_expr(buf, node->as.call.callee);
                 emit(buf, "(");
@@ -1289,25 +1387,35 @@ static void gen_stmt(CodeBuf *buf, AstNode *node)
         if (node->as.return_stmt.value) {
             gen_expr_pre(buf, node->as.return_stmt.value);
 
-            int tmp = buf->tmp_counter++;
             AstType *t = node->as.return_stmt.value->resolved_type;
 
-            emit_indent(buf);
-            gen_type(buf, t);
-            emit(buf, " _urus_ret_%d = ", tmp);
-            gen_expr(buf, node->as.return_stmt.value);
-            emit(buf, ";\n");
-
-            if (type_needs_drop(t) &&
-                node->as.return_stmt.value->kind == NODE_IDENT) {
+            // For generic types, return directly without temp variable
+            if (t && t->kind == TYPE_GENERIC) {
+                emit_defers(buf);
                 emit_indent(buf);
-                emit(buf, "%s = NULL; // move to _urus_ret_%d\n",
-                     node->as.return_stmt.value->as.ident.name, tmp);
-            }
+                emit(buf, "return ");
+                gen_expr(buf, node->as.return_stmt.value);
+                emit(buf, ";\n");
+            } else {
+                int tmp = buf->tmp_counter++;
 
-            emit_defers(buf);
-            emit_indent(buf);
-            emit(buf, "return _urus_ret_%d;\n", tmp);
+                emit_indent(buf);
+                gen_type(buf, t);
+                emit(buf, " _urus_ret_%d = ", tmp);
+                gen_expr(buf, node->as.return_stmt.value);
+                emit(buf, ";\n");
+
+                if (type_needs_drop(t) &&
+                    node->as.return_stmt.value->kind == NODE_IDENT) {
+                    emit_indent(buf);
+                    emit(buf, "%s = NULL; // move to _urus_ret_%d\n",
+                         node->as.return_stmt.value->as.ident.name, tmp);
+                }
+
+                emit_defers(buf);
+                emit_indent(buf);
+                emit(buf, "return _urus_ret_%d;\n", tmp);
+            }
         } else {
             emit_defers(buf);
             emit_indent(buf);
@@ -1551,8 +1659,56 @@ static void gen_fn_decl(CodeBuf *buf, AstNode *node)
 
 // ---- Program ----
 
+// Generate a monomorphized (specialized) version of a generic function
+static void gen_mono_fn(CodeBuf *buf, MonoInstance *m)
+{
+    AstNode *node = m->fn_node;
+    if (!node) return;
+
+    // Create substituted types for params and return type
+    int gpc = node->as.fn_decl.generic_param_count;
+    char **gnames = node->as.fn_decl.generic_params;
+
+    // Emit forward declaration
+    AstType *ret = sema_substitute_type(node->as.fn_decl.return_type,
+                                        gnames, m->type_args, gpc);
+    gen_type(buf, ret);
+    emit(buf, " %s(", m->mangled_name);
+    if (node->as.fn_decl.param_count == 0) {
+        emit(buf, "void");
+    } else {
+        for (int i = 0; i < node->as.fn_decl.param_count; i++) {
+            if (i > 0) emit(buf, ", ");
+            AstType *pt = sema_substitute_type(node->as.fn_decl.params[i].type,
+                                               gnames, m->type_args, gpc);
+            gen_type(buf, pt);
+            emit(buf, " %s", node->as.fn_decl.params[i].name);
+        }
+    }
+    emit(buf, ") {\n");
+
+    // Emit body
+    int saved_defer_count = defer_count;
+    defer_count = 0;
+    buf->indent++;
+    AstNode *body = node->as.fn_decl.body;
+    for (int i = 0; i < body->as.block.stmt_count; i++) {
+        gen_stmt(buf, body->as.block.stmts[i]);
+    }
+    if (defer_count > 0 && ret && ret->kind == TYPE_VOID) {
+        emit_defers(buf);
+    }
+    buf->indent--;
+    emit_indent(buf);
+    emit(buf, "}\n\n");
+    defer_count = saved_defer_count;
+}
+
 void codegen_generate(CodeBuf *buf, AstNode *program)
 {
+    _codegen_program = program;
+    mono_count = 0;
+
     emit(buf, "// Generated by: URUS Compiler, version %s\n",
          URUS_COMPILER_VERSION);
     emit(buf, "%.*s\n", urus_runtime_header_data_len, urus_runtime_header_data);
@@ -1630,10 +1786,10 @@ void codegen_generate(CodeBuf *buf, AstNode *program)
         }
     }
 
-    // Pass 3: function forward declarations
+    // Pass 3: function forward declarations (skip generic templates)
     for (int i = 0; i < program->as.program.decl_count; i++) {
         AstNode *d = program->as.program.decls[i];
-        if (d->kind == NODE_FN_DECL) {
+        if (d->kind == NODE_FN_DECL && d->as.fn_decl.generic_param_count == 0) {
             gen_fn_forward(buf, d);
         }
     }
@@ -1727,12 +1883,43 @@ void codegen_generate(CodeBuf *buf, AstNode *program)
         }
     }
 
-    // Pass 4: function definitions
+    // Pass 4: function definitions (skip generic templates)
     for (int i = 0; i < program->as.program.decl_count; i++) {
         AstNode *d = program->as.program.decls[i];
-        if (d->kind == NODE_FN_DECL) {
+        if (d->kind == NODE_FN_DECL && d->as.fn_decl.generic_param_count == 0) {
             gen_fn_decl(buf, d);
         }
+    }
+
+    // Pass 4b: emit monomorphized generic function specializations
+    // We iterate with index because gen_mono_fn may add new instances
+    for (int i = 0; i < mono_count; i++) {
+        // Emit forward decl first
+        MonoInstance *m = &mono_instances[i];
+        if (!m->fn_node) continue;
+        int gpc = m->fn_node->as.fn_decl.generic_param_count;
+        char **gnames = m->fn_node->as.fn_decl.generic_params;
+        AstType *ret = sema_substitute_type(
+            m->fn_node->as.fn_decl.return_type, gnames, m->type_args, gpc);
+        gen_type(buf, ret);
+        emit(buf, " %s(", m->mangled_name);
+        if (m->fn_node->as.fn_decl.param_count == 0) {
+            emit(buf, "void");
+        } else {
+            for (int j = 0; j < m->fn_node->as.fn_decl.param_count; j++) {
+                if (j > 0) emit(buf, ", ");
+                AstType *pt = sema_substitute_type(
+                    m->fn_node->as.fn_decl.params[j].type,
+                    gnames, m->type_args, gpc);
+                gen_type(buf, pt);
+                emit(buf, " %s", m->fn_node->as.fn_decl.params[j].name);
+            }
+        }
+        emit(buf, ");\n");
+    }
+    emit(buf, "\n");
+    for (int i = 0; i < mono_count; i++) {
+        gen_mono_fn(buf, &mono_instances[i]);
     }
 
     // C main wrapper — check if urus main accepts argc/argv

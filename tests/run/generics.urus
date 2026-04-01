@@ -1,0 +1,21 @@
+fn max_val<T>(a: T, b: T): T {
+    if a > b {
+        return a;
+    }
+    return b;
+}
+
+fn identity<T>(x: T): T {
+    return x;
+}
+
+fn main(): void {
+    let a: int = max_val<int>(10, 20);
+    print(a);
+    let b: float = max_val<float>(3.14, 2.71);
+    print(b);
+    let c: str = identity<str>("hello generics");
+    print(c);
+    let d: int = identity<int>(42);
+    print(d);
+}

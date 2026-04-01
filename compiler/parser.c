@@ -127,6 +127,7 @@ static AstNode *parse_expr(Parser *p);
 static AstNode *parse_statement(Parser *p);
 static AstNode *parse_block(Parser *p);
 static AstType *parse_type(Parser *p);
+static bool try_parse_type_args(Parser *p, AstType ***out_args, int *out_count);
 
 // ---- Rune (macro) table ----
 typedef struct {
@@ -149,6 +150,31 @@ static RuneDef *find_rune(const char *name)
     }
     return NULL;
 }
+
+// ---- Generic parameter parsing ----
+// Parse <T, U, V> after function/struct name. Returns count via out param.
+static char **parse_generic_params(Parser *p, int *out_count)
+{
+    *out_count = 0;
+    if (!match(p, TOK_LT))
+        return NULL;
+    int cap = 4;
+    char **params = xmalloc(sizeof(char *) * (size_t)cap);
+    do {
+        if (*out_count >= cap) {
+            cap *= 2;
+            params = xrealloc(params, sizeof(char *) * (size_t)cap);
+        }
+        Token t = expect(p, TOK_IDENT, "expected generic type parameter name");
+        params[(*out_count)++] = tok_str(t);
+    } while (match(p, TOK_COMMA));
+    expect(p, TOK_GT, "expected '>' after generic parameters");
+    return params;
+}
+
+// Parse <int, str> type arguments in calls/type instantiations.
+// Returns count via out param.
+static AstType **parse_type_args(Parser *p, int *out_count);
 
 // ---- Type parsing ----
 
@@ -202,6 +228,25 @@ static AstType *parse_type(Parser *p)
     }
     error_at(p, current(p), "expected type");
     return ast_type_simple(TYPE_VOID);
+}
+
+// ---- Generic type argument parsing ----
+static AstType **parse_type_args(Parser *p, int *out_count)
+{
+    *out_count = 0;
+    if (!match(p, TOK_LT))
+        return NULL;
+    int cap = 4;
+    AstType **args = xmalloc(sizeof(AstType *) * (size_t)cap);
+    do {
+        if (*out_count >= cap) {
+            cap *= 2;
+            args = xrealloc(args, sizeof(AstType *) * (size_t)cap);
+        }
+        args[(*out_count)++] = parse_type(p);
+    } while (match(p, TOK_COMMA));
+    expect(p, TOK_GT, "expected '>' after type arguments");
+    return args;
 }
 
 // ---- F-string parsing ----
@@ -638,6 +683,12 @@ static AstNode *parse_primary(Parser *p)
             }
             p->pos = saved;
         }
+        // Check for generic struct literal: Ident<T, U> { ... }
+        AstType **struct_type_args = NULL;
+        int struct_type_arg_count = 0;
+        if (check(p, TOK_LT) && name[0] >= 'A' && name[0] <= 'Z') {
+            try_parse_type_args(p, &struct_type_args, &struct_type_arg_count);
+        }
         // Check for struct literal: Ident { field: val, ... } or Ident {} or
         // Ident { ..expr }
         if (check(p, TOK_LBRACE)) {
@@ -651,6 +702,8 @@ static AstNode *parse_primary(Parser *p)
                 n->as.struct_lit.fields = NULL;
                 n->as.struct_lit.field_count = 0;
                 n->as.struct_lit.spread = NULL;
+                n->as.struct_lit.type_args = struct_type_args;
+                n->as.struct_lit.type_arg_count = struct_type_arg_count;
                 return n;
             }
             // Spread-only: Ident { ..expr }
@@ -663,6 +716,8 @@ static AstNode *parse_primary(Parser *p)
                 n->as.struct_lit.fields = NULL;
                 n->as.struct_lit.field_count = 0;
                 n->as.struct_lit.spread = spread;
+                n->as.struct_lit.type_args = struct_type_args;
+                n->as.struct_lit.type_arg_count = struct_type_arg_count;
                 return n;
             }
             if (check(p, TOK_IDENT)) {
@@ -703,6 +758,8 @@ static AstNode *parse_primary(Parser *p)
                     n->as.struct_lit.fields = fields;
                     n->as.struct_lit.field_count = count;
                     n->as.struct_lit.spread = spread;
+                    n->as.struct_lit.type_args = struct_type_args;
+                    n->as.struct_lit.type_arg_count = struct_type_arg_count;
                     return n;
                 }
                 p->pos = saved2;
@@ -781,10 +838,87 @@ static AstNode *parse_primary(Parser *p)
     return ast_new(NODE_INT_LIT, t);
 }
 
+// Try to parse <Type, Type, ...> as generic type arguments.
+// Returns true if successfully parsed (and consumed tokens), false if not
+// (position restored).
+static bool try_parse_type_args(Parser *p, AstType ***out_args, int *out_count)
+{
+    int save_pos = p->pos;
+    bool save_err = p->had_error;
+    *out_count = 0;
+    *out_args = NULL;
+    if (!match(p, TOK_LT)) return false;
+    int cap = 4;
+    AstType **args = xmalloc(sizeof(AstType *) * (size_t)cap);
+    int count = 0;
+    // Simple heuristic: try to parse types until we hit '>'
+    // If we fail or don't find '>' followed by '(', restore
+    do {
+        if (at_end(p) || p->had_error) goto fail;
+        if (count >= cap) {
+            cap *= 2;
+            args = xrealloc(args, sizeof(AstType *) * (size_t)cap);
+        }
+        // Check if current token could be a type
+        Token t = current(p);
+        if (t.type != TOK_IDENT && t.type != TOK_INT && t.type != TOK_FLOAT &&
+            t.type != TOK_BOOL && t.type != TOK_STR && t.type != TOK_VOID &&
+            t.type != TOK_LBRACKET && t.type != TOK_LPAREN) {
+            goto fail;
+        }
+        args[count++] = parse_type(p);
+        if (p->had_error) goto fail;
+    } while (match(p, TOK_COMMA));
+    if (!match(p, TOK_GT)) goto fail;
+    // Must be followed by '(' for function call or '{' for struct literal
+    if (!check(p, TOK_LPAREN) && !check(p, TOK_LBRACE)) goto fail;
+    *out_args = args;
+    *out_count = count;
+    return true;
+fail:
+    free(args);
+    p->pos = save_pos;
+    p->had_error = save_err;
+    *out_count = 0;
+    *out_args = NULL;
+    return false;
+}
+
 static AstNode *parse_call(Parser *p)
 {
     AstNode *expr = parse_primary(p);
     while (true) {
+        // Check for generic type arguments: ident<Type, ...>(args)
+        if (expr->kind == NODE_IDENT && check(p, TOK_LT)) {
+            AstType **type_args = NULL;
+            int type_arg_count = 0;
+            if (try_parse_type_args(p, &type_args, &type_arg_count)) {
+                // Now expect '(' for function call
+                if (match(p, TOK_LPAREN)) {
+                    int cap = 4, count = 0;
+                    AstNode **args = xmalloc(sizeof(AstNode *) * (size_t)cap);
+                    if (!check(p, TOK_RPAREN)) {
+                        do {
+                            if (count >= cap) {
+                                cap *= 2;
+                                args = xrealloc(args,
+                                    sizeof(AstNode *) * (size_t)cap);
+                            }
+                            args[count++] = parse_expr(p);
+                        } while (match(p, TOK_COMMA));
+                    }
+                    expect(p, TOK_RPAREN, "expected ')' after arguments");
+                    AstNode *call = ast_new(NODE_CALL, previous(p));
+                    call->as.call.callee = expr;
+                    call->as.call.args = args;
+                    call->as.call.arg_count = count;
+                    call->as.call.type_args = type_args;
+                    call->as.call.type_arg_count = type_arg_count;
+                    expr = call;
+                    continue;
+                }
+            }
+        }
         if (match(p, TOK_LPAREN)) {
             int cap = 4, count = 0;
             AstNode **args = xmalloc(sizeof(AstNode *) * (size_t)cap);
@@ -1345,6 +1479,11 @@ static AstNode *parse_fn_decl(Parser *p)
 {
     expect(p, TOK_FN, "expected 'fn'");
     Token name = expect(p, TOK_IDENT, "expected function name");
+
+    // Parse optional generic parameters: fn foo<T, U>(...)
+    int generic_count = 0;
+    char **generic_params = parse_generic_params(p, &generic_count);
+
     expect(p, TOK_LPAREN, "expected '('");
 
     int cap = 4, count = 0;
@@ -1395,6 +1534,8 @@ static AstNode *parse_fn_decl(Parser *p)
     n->as.fn_decl.param_count = count;
     n->as.fn_decl.return_type = ret;
     n->as.fn_decl.body = body;
+    n->as.fn_decl.generic_params = generic_params;
+    n->as.fn_decl.generic_param_count = generic_count;
     return n;
 }
 
@@ -1402,6 +1543,11 @@ static AstNode *parse_struct_decl(Parser *p)
 {
     Token struct_tok = expect(p, TOK_STRUCT, "expected 'struct'");
     Token name = expect(p, TOK_IDENT, "expected struct name");
+
+    // Parse optional generic parameters: struct Pair<A, B> { ... }
+    int generic_count = 0;
+    char **generic_params = parse_generic_params(p, &generic_count);
+
     expect(p, TOK_LBRACE, "expected '{'");
 
     int cap = 4, count = 0;
@@ -1431,6 +1577,8 @@ static AstNode *parse_struct_decl(Parser *p)
     n->as.struct_decl.name = tok_str(name);
     n->as.struct_decl.fields = fields;
     n->as.struct_decl.field_count = count;
+    n->as.struct_decl.generic_params = generic_params;
+    n->as.struct_decl.generic_param_count = generic_count;
     return n;
 }
 

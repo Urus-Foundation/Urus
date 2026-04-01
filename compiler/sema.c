@@ -136,6 +136,97 @@ SemaSymbol *scope_add(SemaScope *s, const char *name, Token tok)
     return sym;
 }
 
+// ---- Generic type substitution ----
+
+// Substitute TYPE_GENERIC nodes in a type tree with concrete types.
+// generic_names/concrete_types arrays must be parallel with count entries.
+AstType *sema_substitute_type(AstType *t, char **generic_names,
+                              AstType **concrete_types, int count)
+{
+    if (!t) return NULL;
+    if (t->kind == TYPE_GENERIC || t->kind == TYPE_NAMED) {
+        for (int i = 0; i < count; i++) {
+            if (strcmp(t->name, generic_names[i]) == 0)
+                return ast_type_clone(concrete_types[i]);
+        }
+        return ast_type_clone(t);
+    }
+    if (t->kind == TYPE_ARRAY) {
+        return ast_type_array(
+            sema_substitute_type(t->element, generic_names, concrete_types, count));
+    }
+    if (t->kind == TYPE_RESULT) {
+        return ast_type_result(
+            sema_substitute_type(t->ok_type, generic_names, concrete_types, count),
+            sema_substitute_type(t->err_type, generic_names, concrete_types, count));
+    }
+    if (t->kind == TYPE_TUPLE) {
+        AstType **elems = xmalloc(sizeof(AstType *) * (size_t)t->element_count);
+        for (int i = 0; i < t->element_count; i++)
+            elems[i] = sema_substitute_type(t->element_types[i], generic_names,
+                                            concrete_types, count);
+        return ast_type_tuple(elems, t->element_count);
+    }
+    if (t->kind == TYPE_FN) {
+        AstType **params = xmalloc(sizeof(AstType *) * (size_t)t->param_count);
+        for (int i = 0; i < t->param_count; i++)
+            params[i] = sema_substitute_type(t->param_types[i], generic_names,
+                                             concrete_types, count);
+        return ast_type_fn(params, t->param_count,
+            sema_substitute_type(t->return_type, generic_names, concrete_types, count));
+    }
+    return ast_type_clone(t);
+}
+
+// Try to infer generic type arguments from actual argument types.
+// Returns true if successful, fills inferred_types.
+static bool sema_infer_type_args(SemaSymbol *sym, AstType **arg_types,
+                                 int arg_count, AstType **inferred_types)
+{
+    // Initialize all as NULL
+    for (int i = 0; i < sym->generic_param_count; i++)
+        inferred_types[i] = NULL;
+
+    // For each parameter, try to match its type against the argument type
+    int check_count = arg_count < sym->param_count ? arg_count : sym->param_count;
+    for (int i = 0; i < check_count; i++) {
+        AstType *param_type = sym->params[i].type;
+        AstType *actual_type = arg_types[i];
+        if (!param_type || !actual_type) continue;
+
+        // Direct generic parameter match: param is T, arg is int → T = int
+        if (param_type->kind == TYPE_GENERIC || param_type->kind == TYPE_NAMED) {
+            for (int g = 0; g < sym->generic_param_count; g++) {
+                if (strcmp(param_type->name, sym->generic_params[g]) == 0) {
+                    if (!inferred_types[g]) {
+                        inferred_types[g] = actual_type;
+                    }
+                    break;
+                }
+            }
+        }
+        // Array<T> match: param is [T], arg is [int] → T = int
+        if (param_type->kind == TYPE_ARRAY && actual_type->kind == TYPE_ARRAY &&
+            param_type->element) {
+            for (int g = 0; g < sym->generic_param_count; g++) {
+                if (param_type->element->kind == TYPE_GENERIC &&
+                    strcmp(param_type->element->name, sym->generic_params[g]) == 0) {
+                    if (!inferred_types[g] && actual_type->element) {
+                        inferred_types[g] = actual_type->element;
+                    }
+                    break;
+                }
+            }
+        }
+    }
+
+    // Check all type params were inferred
+    for (int i = 0; i < sym->generic_param_count; i++) {
+        if (!inferred_types[i]) return false;
+    }
+    return true;
+}
+
 // ---- Expression type checking ----
 
 static AstType *set_type(AstNode *node, AstType *t)
@@ -389,8 +480,70 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node)
         }
 
         sym->is_referenced = true;
-        int min_args = 0; // minimal arguments (argument with default value will
-                          // not counted)
+
+        // Generic function handling
+        AstType **resolved_param_types = NULL;
+        AstType *resolved_return_type = NULL;
+        bool is_generic = sym->generic_param_count > 0;
+
+        if (is_generic) {
+            AstType **type_args = NULL;
+            int type_arg_count = 0;
+
+            if (node->as.call.type_arg_count > 0) {
+                // Explicit type arguments: fn<int, str>(...)
+                type_args = node->as.call.type_args;
+                type_arg_count = node->as.call.type_arg_count;
+                if (type_arg_count != sym->generic_param_count) {
+                    sema_error(ctx, &node->tok,
+                               "'%s' expects %d type arguments, got %d",
+                               fn_name, sym->generic_param_count,
+                               type_arg_count);
+                }
+            } else {
+                // Infer type arguments from actual arguments
+                // First, check all argument expressions to get their types
+                AstType **arg_types = xmalloc(
+                    sizeof(AstType *) * (size_t)(node->as.call.arg_count + 1));
+                for (int i = 0; i < node->as.call.arg_count; i++)
+                    arg_types[i] = check_expr(ctx, node->as.call.args[i]);
+
+                type_args = xmalloc(
+                    sizeof(AstType *) * (size_t)sym->generic_param_count);
+                type_arg_count = sym->generic_param_count;
+                if (!sema_infer_type_args(sym, arg_types,
+                                          node->as.call.arg_count, type_args)) {
+                    sema_error(ctx, &node->tok,
+                               "cannot infer type arguments for generic "
+                               "function '%s'; use explicit type arguments",
+                               fn_name);
+                    xfree(arg_types);
+                    xfree(type_args);
+                    return set_type(node, ast_type_simple(TYPE_VOID));
+                }
+                xfree(arg_types);
+            }
+
+            // Substitute generic params with concrete types
+            if (type_arg_count == sym->generic_param_count) {
+                resolved_param_types = xmalloc(
+                    sizeof(AstType *) * (size_t)sym->param_count);
+                for (int i = 0; i < sym->param_count; i++) {
+                    resolved_param_types[i] = sema_substitute_type(
+                        sym->params[i].type, sym->generic_params,
+                        type_args, type_arg_count);
+                }
+                resolved_return_type = sema_substitute_type(
+                    sym->return_type, sym->generic_params,
+                    type_args, type_arg_count);
+            }
+
+            // Store resolved type args on the call node for codegen
+            node->as.call.type_args = type_args;
+            node->as.call.type_arg_count = type_arg_count;
+        }
+
+        int min_args = 0;
         for (int i = 0; i < sym->param_count; i++) {
             if (sym->params[i].default_value == NULL) {
                 min_args++;
@@ -405,20 +558,25 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node)
         }
 
         for (int i = 0; i < node->as.call.arg_count; i++) {
-            AstType *at = check_expr(ctx, node->as.call.args[i]);
-            if (sym->param_count > 0 && i < sym->param_count && sym->params) {
-                if (!ast_types_equal(at, sym->params[i].type)) {
-                    if (sym->params[i].type &&
-                        sym->params[i].type->kind != TYPE_VOID) {
-                        sema_error(
-                            ctx, &node->as.call.args[i]->tok,
-                            "argument %d of '%s': expected '%s', got '%s'",
-                            i + 1, fn_name, ast_type_str(sym->params[i].type),
-                            ast_type_str(at));
-                    }
+            AstType *at = is_generic ? node->as.call.args[i]->resolved_type
+                                     : check_expr(ctx, node->as.call.args[i]);
+            AstType *expected = (is_generic && resolved_param_types)
+                                    ? resolved_param_types[i]
+                                    : (sym->param_count > 0 && i < sym->param_count
+                                           ? sym->params[i].type
+                                           : NULL);
+            if (at && expected && expected->kind != TYPE_VOID) {
+                if (!ast_types_compatible(at, expected)) {
+                    sema_error(
+                        ctx, &node->as.call.args[i]->tok,
+                        "argument %d of '%s': expected '%s', got '%s'",
+                        i + 1, fn_name, ast_type_str(expected),
+                        ast_type_str(at));
                 }
             }
         }
+
+        if (resolved_param_types) xfree(resolved_param_types);
 
         // Inject default parameter values to args
         if (node->as.call.arg_count < sym->param_count &&
@@ -445,7 +603,8 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node)
         }
 
         // Special: unwrap returns the ok_type of the Result argument
-        AstType *final_return = sym->return_type;
+        AstType *final_return = resolved_return_type ? resolved_return_type
+                                                     : sym->return_type;
         if (fn_name && strcmp(fn_name, "unwrap") == 0 &&
             node->as.call.arg_count > 0) {
             AstType *arg_type = node->as.call.args[0]->resolved_type;
@@ -1156,6 +1315,8 @@ bool sema_analyze(AstNode *program, const char *filename)
             s->fields = d->as.struct_decl.fields;
             s->field_count = d->as.struct_decl.field_count;
             s->type = ast_type_named(d->as.struct_decl.name);
+            s->generic_params = d->as.struct_decl.generic_params;
+            s->generic_param_count = d->as.struct_decl.generic_param_count;
         } else if (d->kind == NODE_ENUM_DECL) {
             if (scope_lookup_local(global, d->as.enum_decl.name)) {
                 sema_error(&ctx, &d->tok, "duplicate enum '%s'",
@@ -1176,10 +1337,22 @@ bool sema_analyze(AstNode *program, const char *filename)
             } else if (d->as.fn_decl.return_type->kind == TYPE_NAMED &&
                        !scope_lookup(ctx.current,
                                      d->as.fn_decl.return_type->name)) {
-                sema_error(&ctx, &d->tok,
-                           "function '%s' has unknown return type '%s'",
-                           d->as.fn_decl.name, d->as.fn_decl.return_type->name);
-                continue;
+                // Check if return type is a generic param — that's OK
+                bool is_generic_param = false;
+                for (int g = 0; g < d->as.fn_decl.generic_param_count; g++) {
+                    if (strcmp(d->as.fn_decl.return_type->name,
+                              d->as.fn_decl.generic_params[g]) == 0) {
+                        is_generic_param = true;
+                        break;
+                    }
+                }
+                if (!is_generic_param) {
+                    sema_error(&ctx, &d->tok,
+                               "function '%s' has unknown return type '%s'",
+                               d->as.fn_decl.name,
+                               d->as.fn_decl.return_type->name);
+                    continue;
+                }
             }
             SemaSymbol *s = scope_add(global, d->as.fn_decl.name, d->tok);
             s->tag = FN_SYM_TAG;
@@ -1187,6 +1360,8 @@ bool sema_analyze(AstNode *program, const char *filename)
             s->params = d->as.fn_decl.params;
             s->param_count = d->as.fn_decl.param_count;
             s->return_type = d->as.fn_decl.return_type;
+            s->generic_params = d->as.fn_decl.generic_params;
+            s->generic_param_count = d->as.fn_decl.generic_param_count;
         } else if (d->kind == NODE_CONST_DECL) {
             if (scope_lookup_local(global, d->as.const_decl.name)) {
                 sema_error(&ctx, &d->tok, "duplicate constant '%s'",
@@ -1248,6 +1423,15 @@ bool sema_analyze(AstNode *program, const char *filename)
             SemaScope *fn_scope = scope_new(global);
             ctx.current = fn_scope;
             ctx.current_fn_name = d->as.fn_decl.name;
+
+            // Register generic type parameters in function scope
+            for (int g = 0; g < d->as.fn_decl.generic_param_count; g++) {
+                SemaSymbol *gs = scope_add(fn_scope,
+                    d->as.fn_decl.generic_params[g], d->tok);
+                gs->tag = TYPE_SYM_TAG;
+                gs->alias_type = ast_type_generic(d->as.fn_decl.generic_params[g]);
+                gs->is_referenced = true;
+            }
 
             // Resolve type aliases in return type and params
             d->as.fn_decl.return_type =
