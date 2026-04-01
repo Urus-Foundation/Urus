@@ -455,10 +455,17 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node)
         }
 
         if (node->as.call.callee->kind != NODE_IDENT) {
-            sema_error(ctx, &node->as.call.callee->tok,
-                       "callee must be a function name");
+            // Try calling expression result (e.g. lambda call)
+            AstType *callee_type = check_expr(ctx, node->as.call.callee);
             for (int i = 0; i < node->as.call.arg_count; i++)
                 check_expr(ctx, node->as.call.args[i]);
+            if (callee_type && callee_type->kind == TYPE_FN) {
+                return set_type(node, callee_type->return_type
+                    ? ast_type_clone(callee_type->return_type)
+                    : ast_type_simple(TYPE_VOID));
+            }
+            sema_error(ctx, &node->as.call.callee->tok,
+                       "callee must be a function name");
             return set_type(node, ast_type_simple(TYPE_VOID));
         }
 
@@ -470,6 +477,17 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node)
             for (int i = 0; i < node->as.call.arg_count; i++)
                 check_expr(ctx, node->as.call.args[i]);
             return set_type(node, ast_type_simple(TYPE_VOID));
+        }
+        // Allow calling variables that hold function types
+        if (sym->tag != FN_SYM_TAG && sym->type && sym->type->kind == TYPE_FN) {
+            sym->is_referenced = true;
+            // Set callee resolved_type so codegen can emit proper fn ptr cast
+            set_type(node->as.call.callee, ast_type_clone(sym->type));
+            for (int i = 0; i < node->as.call.arg_count; i++)
+                check_expr(ctx, node->as.call.args[i]);
+            return set_type(node, sym->type->return_type
+                ? ast_type_clone(sym->type->return_type)
+                : ast_type_simple(TYPE_VOID));
         }
         if (sym->tag != FN_SYM_TAG) {
             sema_error(ctx, &node->as.call.callee->tok,
@@ -845,6 +863,50 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node)
             elem_types[i] = t ? ast_type_clone(t) : ast_type_simple(TYPE_VOID);
         }
         return set_type(node, ast_type_tuple(elem_types, count));
+    }
+
+    case NODE_LAMBDA: {
+        // Create a child scope for lambda body
+        SemaScope *lambda_scope = scope_new(ctx->current);
+        // Register parameters
+        for (int i = 0; i < node->as.lambda.param_count; i++) {
+            Param *param = &node->as.lambda.params[i];
+            SemaSymbol sym = {0};
+            sym.name = param->name;
+            sym.type = param->type;
+            sym.tok = param->tok;
+            sym.tag = 'V';
+            sym.is_mut = param->is_mut;
+            sym.is_referenced = true; // suppress unused warnings for params
+            if (lambda_scope->count >= lambda_scope->cap) {
+                lambda_scope->cap *= 2;
+                lambda_scope->syms = xrealloc(lambda_scope->syms,
+                    sizeof(SemaSymbol) * (size_t)lambda_scope->cap);
+            }
+            lambda_scope->syms[lambda_scope->count++] = sym;
+        }
+        // Check body with lambda return type
+        AstType *saved_ret = ctx->current_fn_return;
+        const char *saved_fn = ctx->current_fn_name;
+        ctx->current_fn_return = node->as.lambda.return_type;
+        ctx->current_fn_name = "<lambda>";
+        ctx->current = lambda_scope;
+        check_block(ctx, node->as.lambda.body);
+        ctx->current = lambda_scope->parent;
+        ctx->current_fn_return = saved_ret;
+        ctx->current_fn_name = saved_fn;
+
+        // Capture analysis: walk lambda body for idents not in lambda scope
+        // (simplified — captures detected during check_block above via normal lookup)
+
+        // Build TYPE_FN for the lambda
+        AstType **ptypes = xmalloc(sizeof(AstType *) * (size_t)(node->as.lambda.param_count > 0 ? node->as.lambda.param_count : 1));
+        for (int i = 0; i < node->as.lambda.param_count; i++) {
+            ptypes[i] = ast_type_clone(node->as.lambda.params[i].type);
+        }
+        AstType *fn_type = ast_type_fn(ptypes, node->as.lambda.param_count,
+                                        ast_type_clone(node->as.lambda.return_type));
+        return set_type(node, fn_type);
     }
 
     case NODE_IF_EXPR: {
