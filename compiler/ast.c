@@ -82,6 +82,14 @@ AstType *ast_type_tuple(AstType **elems, int count)
     return t;
 }
 
+AstType *ast_type_generic(const char *name)
+{
+    AstType *t = calloc(1, sizeof(AstType));
+    t->kind = TYPE_GENERIC;
+    t->name = strdup(name);
+    return t;
+}
+
 char *ast_strdup(const char *s, size_t len)
 {
     char *d = xmalloc(len + 1);
@@ -132,7 +140,7 @@ bool ast_types_equal(AstType *a, AstType *b)
         return a == b;
     if (a->kind != b->kind)
         return false;
-    if (a->kind == TYPE_NAMED)
+    if (a->kind == TYPE_NAMED || a->kind == TYPE_GENERIC)
         return strcmp(a->name, b->name) == 0;
     if (a->kind == TYPE_ARRAY)
         return ast_types_equal(a->element, b->element);
@@ -166,6 +174,9 @@ bool ast_types_compatible(AstType *from, AstType *to)
         return false;
     if (ast_types_equal(from, to))
         return true;
+    // Generic types are compatible with anything
+    if (from->kind == TYPE_GENERIC || to->kind == TYPE_GENERIC)
+        return true;
     if (from->kind == TYPE_INT && to->kind == TYPE_FLOAT)
         return true;
     if (from->kind == TYPE_ARRAY && to->kind == TYPE_ARRAY) {
@@ -197,6 +208,8 @@ const char *ast_type_str(AstType *t)
     case TYPE_VOID:
         return "void";
     case TYPE_NAMED:
+        return t->name;
+    case TYPE_GENERIC:
         return t->name;
     case TYPE_ARRAY:
         snprintf(buf, 256, "[%s]", ast_type_str(t->element));
@@ -266,6 +279,9 @@ static void print_type(AstType *t)
         printf("]");
         break;
     case TYPE_NAMED:
+        printf("%s", t->name);
+        break;
+    case TYPE_GENERIC:
         printf("%s", t->name);
         break;
     case TYPE_RESULT:
