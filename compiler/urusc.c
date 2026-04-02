@@ -21,6 +21,9 @@
 
 #include "urusc.h"
 
+// Package manager (pkg.c)
+int pkg_main(int argc, char **argv);
+
 // For command executing
 #ifdef _WIN32
 #define WIN32_LEAN_AND_MEAN
@@ -78,7 +81,8 @@ static void show_help(char *progname)
         "Rust-like safety with Python-like simplicity, transpiling to C11\n\n"
         "Commands:\n"
         "  build       Compile source file (default)\n"
-        "  run         Compile and run immediately\n\n"
+        "  run         Compile and run immediately\n"
+        "  pkg         Package manager (init, add, install, list)\n\n"
         "Options:\n"
         "  --help      Show help message\n"
         "  --version   Show compiler message\n"
@@ -125,7 +129,9 @@ int main(int argc, char **argv)
 
     int arg_start = 1;
     // Check for subcommand
-    if (argc >= 2 && strcmp(argv[1], "run") == 0) {
+    if (argc >= 2 && strcmp(argv[1], "pkg") == 0) {
+        return pkg_main(argc, argv);
+    } else if (argc >= 2 && strcmp(argv[1], "run") == 0) {
         run_after = true;
         arg_start = 2;
     } else if (argc >= 2 && strcmp(argv[1], "build") == 0) {

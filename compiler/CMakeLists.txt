@@ -39,6 +39,7 @@ set(SOURCES
     builtins.c
     codegen.c
     preprocess.c
+    pkg.c
 )
 
 add_executable(urusc ${SOURCES} ${URUS_RUNTIME_EMBEDDED})
