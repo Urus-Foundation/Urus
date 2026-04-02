@@ -731,4 +731,148 @@ static void urus_assert(bool cond, urus_str *msg)
     }
 }
 
+// ============================================================
+// Async/Await (thread-based futures)
+// ============================================================
+
+#ifdef _WIN32
+#include <windows.h>
+#include <process.h>
+
+typedef struct {
+    HANDLE thread;
+    void *result;
+    size_t result_size;
+    volatile bool done;
+} urus_future;
+
+static urus_future *urus_future_new(void) {
+    urus_future *f = (urus_future *)urus_alloc(sizeof(urus_future));
+    f->thread = NULL;
+    f->result = NULL;
+    f->result_size = 0;
+    f->done = false;
+    return f;
+}
+
+static void urus_future_set_result(urus_future *f, void *data, size_t size) {
+    f->result = urus_alloc(size);
+    memcpy(f->result, data, size);
+    f->result_size = size;
+    f->done = true;
+}
+
+static void *urus_future_get(urus_future *f) {
+    if (f->thread) {
+        WaitForSingleObject(f->thread, INFINITE);
+        CloseHandle(f->thread);
+        f->thread = NULL;
+    }
+    return f->result;
+}
+
+static int64_t urus_future_get_int(urus_future *f) {
+    void *r = urus_future_get(f);
+    return r ? *(int64_t *)r : 0;
+}
+
+static double urus_future_get_float(urus_future *f) {
+    void *r = urus_future_get(f);
+    return r ? *(double *)r : 0.0;
+}
+
+static bool urus_future_get_bool(urus_future *f) {
+    void *r = urus_future_get(f);
+    return r ? *(bool *)r : false;
+}
+
+static urus_str *urus_future_get_str(urus_future *f) {
+    void *r = urus_future_get(f);
+    return r ? *(urus_str **)r : NULL;
+}
+
+static void urus_future_drop(urus_future **fp) {
+    if (fp && *fp) {
+        if ((*fp)->thread) {
+            WaitForSingleObject((*fp)->thread, INFINITE);
+            CloseHandle((*fp)->thread);
+        }
+        free((*fp)->result);
+        free(*fp);
+        *fp = NULL;
+    }
+}
+
+static void urus_future_start(urus_future *f, unsigned (__stdcall *func)(void *), void *arg) {
+    f->thread = (HANDLE)_beginthreadex(NULL, 0, func, arg, 0, NULL);
+}
+
+#else
+#include <pthread.h>
+
+typedef struct {
+    pthread_t thread;
+    void *result;
+    size_t result_size;
+    volatile bool done;
+} urus_future;
+
+static urus_future *urus_future_new(void) {
+    urus_future *f = (urus_future *)urus_alloc(sizeof(urus_future));
+    memset(f, 0, sizeof(urus_future));
+    return f;
+}
+
+static void urus_future_set_result(urus_future *f, void *data, size_t size) {
+    f->result = urus_alloc(size);
+    memcpy(f->result, data, size);
+    f->result_size = size;
+    f->done = true;
+}
+
+static void *urus_future_get(urus_future *f) {
+    if (f->thread) {
+        pthread_join(f->thread, NULL);
+        f->thread = 0;
+    }
+    return f->result;
+}
+
+static int64_t urus_future_get_int(urus_future *f) {
+    void *r = urus_future_get(f);
+    return r ? *(int64_t *)r : 0;
+}
+
+static double urus_future_get_float(urus_future *f) {
+    void *r = urus_future_get(f);
+    return r ? *(double *)r : 0.0;
+}
+
+static bool urus_future_get_bool(urus_future *f) {
+    void *r = urus_future_get(f);
+    return r ? *(bool *)r : false;
+}
+
+static urus_str *urus_future_get_str(urus_future *f) {
+    void *r = urus_future_get(f);
+    return r ? *(urus_str **)r : NULL;
+}
+
+static void urus_future_drop(urus_future **fp) {
+    if (fp && *fp) {
+        if ((*fp)->thread) {
+            pthread_join((*fp)->thread, NULL);
+        }
+        free((*fp)->result);
+        free(*fp);
+        *fp = NULL;
+    }
+}
+
+static void urus_future_start(urus_future *f, void *(*func)(void *), void *arg) {
+    pthread_create(&f->thread, NULL, func, arg);
+}
+
+#endif
+
 #endif

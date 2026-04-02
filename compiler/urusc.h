@@ -172,6 +172,7 @@ typedef enum {
     NODE_IF_EXPR, // if cond { expr } else { expr } (expression context)
     NODE_RUNE_DECL, // rune name(params) { body }
     NODE_CONST_DECL, // const NAME: type = value;
+    NODE_AWAIT_EXPR, // await expr
 } NodeKind;
 
 // ---- Param ----
@@ -232,6 +233,7 @@ struct AstNode {
             // Generics
             char **generic_params; // e.g. ["T", "U"]
             int generic_param_count;
+            bool is_async;
         } fn_decl;
 
         // NODE_STRUCT_DECL
@@ -496,6 +498,11 @@ struct AstNode {
             AstNode **methods; // NODE_FN_DECL nodes with bodies
             int method_count;
         } impl_block;
+
+        // NODE_AWAIT_EXPR
+        struct {
+            AstNode *expr;
+        } await_expr;
     } as;
 
     // Filled by semantic analysis
@@ -504,6 +511,7 @@ struct AstNode {
     // Parser flags
     bool is_imported; // prevent unused warning
     bool parenthesized; // wrapped in redundant ()
+    bool is_async_call; // call to an async function (returns urus_future*)
 
     // Filled by codegen (temp variable ID)
     int _codegen_tmp;
@@ -585,6 +593,7 @@ typedef struct {
     bool is_referenced;
     bool is_imported; // prevent unused warning on imported decl
     bool is_builtin; // prevent unused warning on builtin function/variable
+    bool is_async; // async function
 
     // function
     Param *params;

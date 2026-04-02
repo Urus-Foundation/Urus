@@ -418,6 +418,14 @@ static AstNode *parse_primary(Parser *p)
 {
     Token t = current(p);
 
+    // await expression
+    if (match(p, TOK_AWAIT)) {
+        AstNode *expr = parse_expr(p);
+        AstNode *n = ast_new(NODE_AWAIT_EXPR, t);
+        n->as.await_expr.expr = expr;
+        return n;
+    }
+
     if (match(p, TOK_INT_LIT)) {
         AstNode *n = ast_new(NODE_INT_LIT, t);
         errno = 0;
@@ -1965,6 +1973,12 @@ static AstNode *parse_impl_block(Parser *p)
 
 static AstNode *parse_declaration(Parser *p)
 {
+    if (check(p, TOK_ASYNC)) {
+        advance_tok(p);
+        AstNode *fn = parse_fn_decl(p);
+        fn->as.fn_decl.is_async = true;
+        return fn;
+    }
     if (check(p, TOK_FN))
         return parse_fn_decl(p);
     if (check(p, TOK_STRUCT))

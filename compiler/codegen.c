@@ -1015,6 +1015,23 @@ static void gen_expr(CodeBuf *buf, AstNode *node)
         // Lambda becomes a function pointer cast to void*
         emit(buf, "(void*)_urus_lambda_%d", node->as.lambda.lambda_id);
         break;
+    case NODE_AWAIT_EXPR: {
+        AstType *t = node->resolved_type;
+        if (t && t->kind == TYPE_INT) {
+            emit(buf, "urus_future_get_int(");
+        } else if (t && t->kind == TYPE_FLOAT) {
+            emit(buf, "urus_future_get_float(");
+        } else if (t && t->kind == TYPE_BOOL) {
+            emit(buf, "urus_future_get_bool(");
+        } else if (t && t->kind == TYPE_STR) {
+            emit(buf, "urus_future_get_str(");
+        } else {
+            emit(buf, "urus_future_get(");
+        }
+        gen_expr(buf, node->as.await_expr.expr);
+        emit(buf, ")");
+        break;
+    }
     default:
         emit(buf, "/* unsupported expr */0");
         break;
@@ -1267,6 +1284,14 @@ static void gen_stmt(CodeBuf *buf, AstNode *node)
         }
 
         emit_indent(buf);
+
+        // Async call returns urus_future*, not the declared type
+        if (node->as.let_stmt.init && node->as.let_stmt.init->is_async_call) {
+            emit(buf, "URUS_RAII(urus_future_drop) urus_future* %s = ", node->as.let_stmt.name);
+            gen_expr(buf, node->as.let_stmt.init);
+            emit(buf, ";\n");
+            break;
+        }
 
         // Emit RAII auto destruct __attribute((cleanup()))
         bool needs_rc = type_needs_drop(node->as.let_stmt.type);
@@ -1717,8 +1742,12 @@ static void gen_enum_decl(CodeBuf *buf, AstNode *node)
 static void gen_fn_forward(CodeBuf *buf, AstNode *node)
 {
     bool is_main = strcmp(node->as.fn_decl.name, "main") == 0;
-    gen_type(buf, node->as.fn_decl.return_type);
-    emit(buf, " %s(", is_main ? "urus_main" : node->as.fn_decl.name);
+    if (node->as.fn_decl.is_async && !is_main) {
+        emit(buf, "urus_future* %s(", node->as.fn_decl.name);
+    } else {
+        gen_type(buf, node->as.fn_decl.return_type);
+        emit(buf, " %s(", is_main ? "urus_main" : node->as.fn_decl.name);
+    }
     if (node->as.fn_decl.param_count == 0) {
         emit(buf, "void");
     } else {
@@ -1735,8 +1764,129 @@ static void gen_fn_forward(CodeBuf *buf, AstNode *node)
 static void gen_fn_decl(CodeBuf *buf, AstNode *node)
 {
     bool is_main = strcmp(node->as.fn_decl.name, "main") == 0;
+    const char *fn_name = is_main ? "urus_main" : node->as.fn_decl.name;
+
+    if (node->as.fn_decl.is_async && !is_main) {
+        // Generate async function: args struct + thread body + wrapper
+        const char *name = node->as.fn_decl.name;
+        AstType *ret = node->as.fn_decl.return_type;
+        int pc = node->as.fn_decl.param_count;
+
+        // 1. Args struct
+        if (pc > 0) {
+            emit(buf, "typedef struct { urus_future *_fut;");
+            for (int i = 0; i < pc; i++) {
+                emit(buf, " ");
+                gen_type(buf, node->as.fn_decl.params[i].type);
+                emit(buf, " %s;", node->as.fn_decl.params[i].name);
+            }
+            emit(buf, " } _async_%s_args;\n", name);
+        }
+
+        // 2. Inner body function (does the actual work)
+        gen_type(buf, ret);
+        emit(buf, " _async_%s_body(", name);
+        if (pc == 0) {
+            emit(buf, "void");
+        } else {
+            for (int i = 0; i < pc; i++) {
+                if (i > 0) emit(buf, ", ");
+                gen_type(buf, node->as.fn_decl.params[i].type);
+                emit(buf, " %s", node->as.fn_decl.params[i].name);
+            }
+        }
+        emit(buf, ") ");
+        {
+            int saved_defer_count = defer_count;
+            defer_count = 0;
+            AstNode *body = node->as.fn_decl.body;
+            emit(buf, "{\n");
+            buf->indent++;
+            for (int i = 0; i < body->as.block.stmt_count; i++) {
+                gen_stmt(buf, body->as.block.stmts[i]);
+            }
+            if (defer_count > 0 && ret && ret->kind == TYPE_VOID) {
+                emit_defers(buf);
+            }
+            buf->indent--;
+            emit_indent(buf);
+            emit(buf, "}\n\n");
+            defer_count = saved_defer_count;
+        }
+
+        // 3. Thread entry point
+        emit(buf, "#ifdef _WIN32\n");
+        emit(buf, "static unsigned __stdcall _async_%s_thread(void *_arg) {\n", name);
+        emit(buf, "#else\n");
+        emit(buf, "static void *_async_%s_thread(void *_arg) {\n", name);
+        emit(buf, "#endif\n");
+        if (pc > 0) {
+            emit(buf, "    _async_%s_args *args = (_async_%s_args *)_arg;\n", name, name);
+            emit(buf, "    ");
+            if (ret && ret->kind != TYPE_VOID) {
+                gen_type(buf, ret);
+                emit(buf, " _result = ");
+            }
+            emit(buf, "_async_%s_body(", name);
+            for (int i = 0; i < pc; i++) {
+                if (i > 0) emit(buf, ", ");
+                emit(buf, "args->%s", node->as.fn_decl.params[i].name);
+            }
+            emit(buf, ");\n");
+            if (ret && ret->kind != TYPE_VOID) {
+                emit(buf, "    urus_future_set_result(args->_fut, &_result, sizeof(_result));\n");
+            }
+            emit(buf, "    free(args);\n");
+        } else {
+            emit(buf, "    urus_future *_fut = (urus_future *)_arg;\n");
+            emit(buf, "    ");
+            if (ret && ret->kind != TYPE_VOID) {
+                gen_type(buf, ret);
+                emit(buf, " _result = ");
+            }
+            emit(buf, "_async_%s_body();\n", name);
+            if (ret && ret->kind != TYPE_VOID) {
+                emit(buf, "    urus_future_set_result(_fut, &_result, sizeof(_result));\n");
+            }
+        }
+        emit(buf, "#ifdef _WIN32\n");
+        emit(buf, "    return 0;\n");
+        emit(buf, "#else\n");
+        emit(buf, "    return NULL;\n");
+        emit(buf, "#endif\n");
+        emit(buf, "}\n\n");
+
+        // 4. Public wrapper that returns urus_future*
+        emit(buf, "urus_future* %s(", name);
+        if (pc == 0) {
+            emit(buf, "void");
+        } else {
+            for (int i = 0; i < pc; i++) {
+                if (i > 0) emit(buf, ", ");
+                gen_type(buf, node->as.fn_decl.params[i].type);
+                emit(buf, " %s", node->as.fn_decl.params[i].name);
+            }
+        }
+        emit(buf, ") {\n");
+        emit(buf, "    urus_future *_fut = urus_future_new();\n");
+        if (pc > 0) {
+            emit(buf, "    _async_%s_args *_args = malloc(sizeof(_async_%s_args));\n", name, name);
+            emit(buf, "    _args->_fut = _fut;\n");
+            for (int i = 0; i < pc; i++) {
+                emit(buf, "    _args->%s = %s;\n",
+                     node->as.fn_decl.params[i].name,
+                     node->as.fn_decl.params[i].name);
+            }
+            emit(buf, "    urus_future_start(_fut, _async_%s_thread, _args);\n", name);
+        } else {
+            emit(buf, "    urus_future_start(_fut, _async_%s_thread, _fut);\n", name);
+        }
+        emit(buf, "    return _fut;\n}\n\n");
+        return;
+    }
+
     gen_type(buf, node->as.fn_decl.return_type);
-    emit(buf, " %s(", is_main ? "urus_main" : node->as.fn_decl.name);
+    emit(buf, " %s(", fn_name);
     if (node->as.fn_decl.param_count == 0) {
         emit(buf, "void");
     } else {

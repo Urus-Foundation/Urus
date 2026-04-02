@@ -1,0 +1,23 @@
+
+async fn compute(x: int): int {
+    return x * x;
+}
+
+async fn greet(name: str): str {
+    return "Hello, " + name + "!";
+}
+
+fn main(): void {
+    let fut1 = compute(7);
+    let fut2 = compute(3);
+
+    let r1: int = await fut1;
+    let r2: int = await fut2;
+
+    print(r1);
+    print(r2);
+
+    let fut3 = greet("Urus");
+    let msg: str = await fut3;
+    print(msg);
+}

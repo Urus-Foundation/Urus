@@ -40,6 +40,8 @@ typedef enum {
     TOK_EMIT,
     TOK_TRAIT,
     TOK_IMPL,
+    TOK_ASYNC,
+    TOK_AWAIT,
 
     // Type keywords
     TOK_INT,

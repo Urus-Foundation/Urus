@@ -498,6 +498,7 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node)
         }
 
         sym->is_referenced = true;
+        if (sym->is_async) node->is_async_call = true;
 
         // Generic function handling
         AstType **resolved_param_types = NULL;
@@ -915,6 +916,13 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node)
         check_expr(ctx, node->as.if_expr.else_expr);
         return set_type(node, then_t ? ast_type_clone(then_t)
                                      : ast_type_simple(TYPE_VOID));
+    }
+
+    case NODE_AWAIT_EXPR: {
+        AstType *t = check_expr(ctx, node->as.await_expr.expr);
+        // await unwraps the future — returns the inner type
+        // For now, the awaited expression's type IS the result type
+        return set_type(node, t ? ast_type_clone(t) : ast_type_simple(TYPE_VOID));
     }
 
     default:
@@ -1424,6 +1432,7 @@ bool sema_analyze(AstNode *program, const char *filename)
             s->return_type = d->as.fn_decl.return_type;
             s->generic_params = d->as.fn_decl.generic_params;
             s->generic_param_count = d->as.fn_decl.generic_param_count;
+            s->is_async = d->as.fn_decl.is_async;
         } else if (d->kind == NODE_CONST_DECL) {
             if (scope_lookup_local(global, d->as.const_decl.name)) {
                 sema_error(&ctx, &d->tok, "duplicate constant '%s'",
