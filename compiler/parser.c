@@ -1024,6 +1024,11 @@ static AstNode *parse_call(Parser *p)
             idx->as.index_expr.object = expr;
             idx->as.index_expr.index = index;
             expr = idx;
+        } else if (match(p, TOK_QUESTION)) {
+            // Error propagation: expr?
+            AstNode *prop = ast_new(NODE_PROPAGATE, previous(p));
+            prop->as.propagate.expr = expr;
+            expr = prop;
         } else {
             break;
         }
@@ -1471,6 +1476,23 @@ static AstNode *parse_statement(Parser *p)
         return parse_emit(p, false);
     if (check(p, TOK_RETURN))
         return parse_return(p);
+    if (match(p, TOK_TRY)) {
+        AstNode *try_block = parse_block(p);
+        expect(p, TOK_CATCH, "expected 'catch' after try block");
+        expect(p, TOK_LPAREN, "expected '(' after catch");
+        Token var = expect(p, TOK_IDENT, "expected error variable name");
+        // Optional type annotation
+        if (match(p, TOK_COLON)) {
+            parse_type(p); // consume but ignore (always str for now)
+        }
+        expect(p, TOK_RPAREN, "expected ')' after catch variable");
+        AstNode *catch_block = parse_block(p);
+        AstNode *n = ast_new(NODE_TRY_CATCH, previous(p));
+        n->as.try_catch.try_block = try_block;
+        n->as.try_catch.catch_var = tok_str(var);
+        n->as.try_catch.catch_block = catch_block;
+        return n;
+    }
     if (match(p, TOK_BREAK)) {
         expect(p, TOK_SEMICOLON, "expected ';' after break");
         return ast_new(NODE_BREAK_STMT, previous(p));

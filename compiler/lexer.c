@@ -125,7 +125,8 @@ static TokenType check_keyword(const char *start, size_t len)
         {"__emit__", 8, TOK_EMIT}, {"type", 4, TOK_TYPE},
         {"defer", 5, TOK_DEFER},   {"trait", 5, TOK_TRAIT},
         {"impl", 4, TOK_IMPL},     {"async", 5, TOK_ASYNC},
-        {"await", 5, TOK_AWAIT},   {"int", 3, TOK_INT},
+        {"await", 5, TOK_AWAIT},   {"try", 3, TOK_TRY},
+        {"catch", 5, TOK_CATCH},   {"int", 3, TOK_INT},
         {"float", 5, TOK_FLOAT},   {"bool", 4, TOK_BOOL},
         {"str", 3, TOK_STR},       {"void", 4, TOK_VOID},
         {"Ok", 2, TOK_OK},         {"Err", 3, TOK_ERR},
@@ -472,6 +473,8 @@ Token lexer_next(Lexer *l)
         return make_token(l, TOK_CARET, start, 1);
     case '~':
         return make_token(l, TOK_TILDE, start, 1);
+    case '?':
+        return make_token(l, TOK_QUESTION, start, 1);
     case '.':
         if (peek(l) == '.') {
             advance(l);

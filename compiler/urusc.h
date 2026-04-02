@@ -173,6 +173,8 @@ typedef enum {
     NODE_RUNE_DECL, // rune name(params) { body }
     NODE_CONST_DECL, // const NAME: type = value;
     NODE_AWAIT_EXPR, // await expr
+    NODE_TRY_CATCH, // try { } catch (e) { }
+    NODE_PROPAGATE, // expr? (error propagation)
 } NodeKind;
 
 // ---- Param ----
@@ -503,6 +505,18 @@ struct AstNode {
         struct {
             AstNode *expr;
         } await_expr;
+
+        // NODE_TRY_CATCH
+        struct {
+            AstNode *try_block;
+            char *catch_var; // variable name for caught error
+            AstNode *catch_block;
+        } try_catch;
+
+        // NODE_PROPAGATE (expr?)
+        struct {
+            AstNode *expr;
+        } propagate;
     } as;
 
     // Filled by semantic analysis

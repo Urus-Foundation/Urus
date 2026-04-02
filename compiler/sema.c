@@ -925,6 +925,17 @@ static AstType *check_expr(SemaCtx *ctx, AstNode *node)
         return set_type(node, t ? ast_type_clone(t) : ast_type_simple(TYPE_VOID));
     }
 
+    case NODE_PROPAGATE: {
+        AstType *t = check_expr(ctx, node->as.propagate.expr);
+        if (t && t->kind == TYPE_RESULT) {
+            // ? unwraps Result<T, E> → returns T on Ok, propagates Err
+            return set_type(node, t->ok_type ? ast_type_clone(t->ok_type)
+                                             : ast_type_simple(TYPE_VOID));
+        }
+        sema_error(ctx, &node->tok, "'?' operator requires a Result type");
+        return set_type(node, ast_type_simple(TYPE_VOID));
+    }
+
     default:
         return set_type(node, ast_type_simple(TYPE_VOID));
     }
@@ -1213,6 +1224,22 @@ static void check_stmt(SemaCtx *ctx, AstNode *node)
     case NODE_EMIT_STMT:
         // Raw emit; No check. Trust the author.
         break;
+
+    case NODE_TRY_CATCH: {
+        check_block(ctx, node->as.try_catch.try_block);
+        // Create scope for catch block with error variable
+        SemaScope *catch_scope = scope_new(ctx->current);
+        SemaSymbol *err_sym = scope_add(catch_scope, node->as.try_catch.catch_var,
+                                         node->tok);
+        err_sym->tag = 'V';
+        err_sym->type = ast_type_simple(TYPE_STR);
+        err_sym->is_mut = false;
+        err_sym->is_referenced = true;
+        ctx->current = catch_scope;
+        check_block(ctx, node->as.try_catch.catch_block);
+        ctx->current = catch_scope->parent;
+        break;
+    }
 
     case NODE_BLOCK:
         check_block(ctx, node);

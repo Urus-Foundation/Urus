@@ -1,0 +1,25 @@
+fn divide(a: int, b: int): Result<int, str> {
+    if b == 0 {
+        return Err("division by zero");
+    }
+    return Ok(a / b);
+}
+
+fn compute(x: int): Result<int, str> {
+    let val: int = divide(x, 2)?;
+    let val2: int = divide(val, 0)?;
+    return Ok(val2);
+}
+
+fn main(): void {
+    try {
+        let result: int = compute(10)?;
+        print(result);
+    } catch (e: str) {
+        print("Caught: " + e);
+    }
+
+    let r: Result<int, str> = divide(10, 2);
+    let v: int = unwrap(r);
+    print(v);
+}

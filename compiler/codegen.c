@@ -201,6 +201,13 @@ static void collect_lambdas(AstNode *node)
         for (int i = 0; i < node->as.impl_block.method_count; i++)
             collect_lambdas(node->as.impl_block.methods[i]);
         break;
+    case NODE_TRY_CATCH:
+        collect_lambdas(node->as.try_catch.try_block);
+        collect_lambdas(node->as.try_catch.catch_block);
+        break;
+    case NODE_PROPAGATE:
+        collect_lambdas(node->as.propagate.expr);
+        break;
     default:
         break;
     }
@@ -1032,6 +1039,25 @@ static void gen_expr(CodeBuf *buf, AstNode *node)
         emit(buf, ")");
         break;
     }
+    case NODE_PROPAGATE: {
+        // Unwrap the Ok value — pre-statement already checked for Err
+        AstType *ok_t = node->resolved_type;
+        if (ok_t && ok_t->kind == TYPE_INT) {
+            emit(buf, "_urus_prop_%d->data.ok.as_int", node->_codegen_tmp);
+        } else if (ok_t && ok_t->kind == TYPE_FLOAT) {
+            emit(buf, "_urus_prop_%d->data.ok.as_float", node->_codegen_tmp);
+        } else if (ok_t && ok_t->kind == TYPE_BOOL) {
+            emit(buf, "_urus_prop_%d->data.ok.as_bool", node->_codegen_tmp);
+        } else if (ok_t && (ok_t->kind == TYPE_STR || ok_t->kind == TYPE_NAMED ||
+                            ok_t->kind == TYPE_ARRAY)) {
+            emit(buf, "(");
+            gen_type(buf, ok_t);
+            emit(buf, ")_urus_prop_%d->data.ok.as_ptr", node->_codegen_tmp);
+        } else {
+            emit(buf, "_urus_prop_%d->data.ok.as_int", node->_codegen_tmp);
+        }
+        break;
+    }
     default:
         emit(buf, "/* unsupported expr */0");
         break;
@@ -1197,6 +1223,25 @@ static int gen_expr_pre(CodeBuf *buf, AstNode *node)
         emit(buf, "urus_result* _urus_res_%d = urus_result_err(", tmp);
         gen_expr(buf, node->as.result_expr.value);
         emit(buf, ");\n");
+        return tmp;
+    }
+    case NODE_PROPAGATE: {
+        gen_expr_pre(buf, node->as.propagate.expr);
+        int tmp = buf->tmp_counter++;
+        node->_codegen_tmp = tmp;
+        emit_indent(buf);
+        emit(buf, "urus_result* _urus_prop_%d = ", tmp);
+        gen_expr(buf, node->as.propagate.expr);
+        emit(buf, ";\n");
+        emit_indent(buf);
+        emit(buf, "if (_urus_prop_%d->tag != 0) {\n", tmp);
+        // If inside try-catch, throw; otherwise return the error
+        emit_indent(buf);
+        emit(buf, "    if (_urus_try_depth > 0) { _urus_throw(_urus_prop_%d->data.err); }\n", tmp);
+        emit_indent(buf);
+        emit(buf, "    return urus_result_err(_urus_prop_%d->data.err);\n", tmp);
+        emit_indent(buf);
+        emit(buf, "}\n");
         return tmp;
     }
     case NODE_CALL: {
@@ -1568,6 +1613,32 @@ static void gen_stmt(CodeBuf *buf, AstNode *node)
         }
         defer_stack[defer_count++] = node->as.defer_stmt.body;
         break;
+    case NODE_TRY_CATCH: {
+        int try_id = buf->tmp_counter++;
+        emit_indent(buf);
+        emit(buf, "/* try-catch */\n");
+        emit_indent(buf);
+        emit(buf, "_urus_try_depth++;\n");
+        emit_indent(buf);
+        emit(buf, "if (setjmp(_urus_try_stack[_urus_try_depth - 1]) == 0) ");
+        gen_block(buf, node->as.try_catch.try_block);
+        emit_indent(buf);
+        emit(buf, " else {\n");
+        buf->indent++;
+        emit_indent(buf);
+        emit(buf, "urus_str* %s = _urus_try_err[_urus_try_depth - 1];\n",
+             node->as.try_catch.catch_var);
+        for (int i = 0; i < node->as.try_catch.catch_block->as.block.stmt_count; i++) {
+            gen_stmt(buf, node->as.try_catch.catch_block->as.block.stmts[i]);
+        }
+        buf->indent--;
+        emit_indent(buf);
+        emit(buf, "}\n");
+        emit_indent(buf);
+        emit(buf, "_urus_try_depth--;\n");
+        (void)try_id;
+        break;
+    }
     case NODE_BREAK_STMT:
         emit_indent(buf);
         emit(buf, "break;\n");

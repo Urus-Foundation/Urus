@@ -29,6 +29,7 @@
 #include <ctype.h>
 #include <inttypes.h>
 #include <math.h>
+#include <setjmp.h>
 #include <stdbool.h>
 #include <stddef.h>
 #include <stdint.h>
@@ -729,6 +730,24 @@ static void urus_assert(bool cond, urus_str *msg)
         fprintf(stderr, "Assertion failed: %s\n", msg->data);
         exit(1);
     }
+}
+
+// ============================================================
+// Try/Catch (setjmp-based error handling)
+// ============================================================
+
+#define URUS_TRY_STACK_MAX 32
+static _Thread_local jmp_buf _urus_try_stack[URUS_TRY_STACK_MAX];
+static _Thread_local urus_str *_urus_try_err[URUS_TRY_STACK_MAX];
+static _Thread_local int _urus_try_depth = 0;
+
+static void _urus_throw(urus_str *err) {
+    if (_urus_try_depth > 0) {
+        _urus_try_err[_urus_try_depth - 1] = err;
+        longjmp(_urus_try_stack[_urus_try_depth - 1], 1);
+    }
+    fprintf(stderr, "Unhandled error: %s\n", err->data);
+    exit(1);
 }
 
 // ============================================================
