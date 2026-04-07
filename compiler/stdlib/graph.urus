@@ -1,0 +1,256 @@
+// graph.urus — Text-based charting stdlib for terminal output
+import math;
+
+// ============================================================
+// Bar Chart (horizontal)
+// ============================================================
+
+// Print a horizontal bar chart from labels and values.
+// max_width is the maximum bar width in characters.
+fn graph_bar(labels: [str], values: [float], max_width: int): void {
+    let n: int = len(labels);
+    if n == 0 || n != len(values) {
+        print("[graph] error: labels and values must be non-empty and same length");
+        return;
+    }
+
+    // find max value
+    let mut max_val: float = values[0];
+    for i in 1..n {
+        if values[i] > max_val {
+            max_val = values[i];
+        }
+    }
+    if max_val <= 0.0 {
+        max_val = 1.0;
+    }
+
+    // find longest label for alignment
+    let mut max_label: int = 0;
+    for i in 0..n {
+        let l: int = str_len(labels[i]);
+        if l > max_label {
+            max_label = l;
+        }
+    }
+
+    // print bars
+    for i in 0..n {
+        let bar_len: int = to_int(math_round(values[i] / max_val * to_float(max_width)));
+        let mut bar: str = "";
+        for j in 0..bar_len {
+            bar = bar + "#";
+        }
+        // pad label
+        let mut padded: str = labels[i];
+        while str_len(padded) < max_label {
+            padded = padded + " ";
+        }
+        print(f"{padded} | {bar} {values[i]}");
+    }
+}
+
+// Simple bar chart with default width of 40.
+fn graph_bar_simple(labels: [str], values: [float]): void {
+    graph_bar(labels, values, 40);
+}
+
+// ============================================================
+// Line Chart (vertical, text-based)
+// ============================================================
+
+// Print a line chart of values. height is the chart height in rows.
+fn graph_line(values: [float], height: int): void {
+    let n: int = len(values);
+    if n == 0 {
+        print("[graph] error: values must not be empty");
+        return;
+    }
+
+    let mut min_val: float = values[0];
+    let mut max_val: float = values[0];
+    for i in 1..n {
+        if values[i] < min_val { min_val = values[i]; }
+        if values[i] > max_val { max_val = values[i]; }
+    }
+
+    let range: float = max_val - min_val;
+    let safe_range: float = if range > 0.0 { range } else { 1.0 };
+
+    // Build grid: row 0 = top (max_val), row height-1 = bottom (min_val)
+    for row in 0..height {
+        let threshold: float = max_val - (to_float(row) / to_float(height - 1)) * safe_range;
+        let mut line: str = "";
+        for col in 0..n {
+            if values[col] >= threshold {
+                line = line + "*";
+            } else {
+                line = line + " ";
+            }
+        }
+        // label on first and last row
+        if row == 0 {
+            print(f"{line}  {max_val}");
+        } else if row == height - 1 {
+            print(f"{line}  {min_val}");
+        } else {
+            print(line);
+        }
+    }
+}
+
+// ============================================================
+// Histogram
+// ============================================================
+
+// Print a histogram of data with the given number of bins.
+fn graph_histogram(data: [float], bins: int): void {
+    let n: int = len(data);
+    if n == 0 || bins <= 0 {
+        print("[graph] error: data must not be empty and bins must be > 0");
+        return;
+    }
+
+    let mut min_val: float = data[0];
+    let mut max_val: float = data[0];
+    for i in 1..n {
+        if data[i] < min_val { min_val = data[i]; }
+        if data[i] > max_val { max_val = data[i]; }
+    }
+
+    let range: float = max_val - min_val;
+    let bin_width: float = if range > 0.0 { range / to_float(bins) } else { 1.0 };
+
+    // count per bin
+    let mut counts: [int] = [];
+    for i in 0..bins {
+        push(counts, 0);
+    }
+
+    for i in 0..n {
+        let mut idx: int = to_int(math_floor((data[i] - min_val) / bin_width));
+        if idx >= bins {
+            idx = bins - 1;
+        }
+        counts[idx] = counts[idx] + 1;
+    }
+
+    // find max count for scaling
+    let mut max_count: int = 0;
+    for i in 0..bins {
+        if counts[i] > max_count {
+            max_count = counts[i];
+        }
+    }
+    if max_count == 0 {
+        max_count = 1;
+    }
+
+    // print
+    for i in 0..bins {
+        let lo: float = min_val + to_float(i) * bin_width;
+        let hi: float = lo + bin_width;
+        let bar_len: int = to_int(math_round(to_float(counts[i]) / to_float(max_count) * 30.0));
+        let mut bar: str = "";
+        for j in 0..bar_len {
+            bar = bar + "#";
+        }
+        let lo_r: float = math_round(lo * 100.0) / 100.0;
+        let hi_r: float = math_round(hi * 100.0) / 100.0;
+        print(f"[{lo_r}, {hi_r}) | {bar} {counts[i]}");
+    }
+}
+
+// ============================================================
+// Scatter Plot (text-based)
+// ============================================================
+
+// Print a scatter plot of (x, y) pairs. width x height in characters.
+fn graph_scatter(xs: [float], ys: [float], width: int, height: int): void {
+    let n: int = len(xs);
+    if n == 0 || n != len(ys) {
+        print("[graph] error: xs and ys must be non-empty and same length");
+        return;
+    }
+
+    let mut x_min: float = xs[0];
+    let mut x_max: float = xs[0];
+    let mut y_min: float = ys[0];
+    let mut y_max: float = ys[0];
+    for i in 1..n {
+        if xs[i] < x_min { x_min = xs[i]; }
+        if xs[i] > x_max { x_max = xs[i]; }
+        if ys[i] < y_min { y_min = ys[i]; }
+        if ys[i] > y_max { y_max = ys[i]; }
+    }
+
+    let x_range: float = if x_max > x_min { x_max - x_min } else { 1.0 };
+    let y_range: float = if y_max > y_min { y_max - y_min } else { 1.0 };
+
+    // Build a 2D grid
+    // grid[row * width + col] = true/false
+    let total: int = width * height;
+    let mut grid: [int] = [];
+    for i in 0..total {
+        push(grid, 0);
+    }
+
+    // plot points
+    for i in 0..n {
+        let col: int = to_int(math_round((xs[i] - x_min) / x_range * to_float(width - 1)));
+        let row: int = to_int(math_round((1.0 - (ys[i] - y_min) / y_range) * to_float(height - 1)));
+        let mut c: int = col;
+        let mut r: int = row;
+        if c < 0 { c = 0; }
+        if c >= width { c = width - 1; }
+        if r < 0 { r = 0; }
+        if r >= height { r = height - 1; }
+        grid[r * width + c] = 1;
+    }
+
+    // render
+    for row in 0..height {
+        let mut line: str = "";
+        for col in 0..width {
+            if grid[row * width + col] == 1 {
+                line = line + "*";
+            } else {
+                line = line + ".";
+            }
+        }
+        print(line);
+    }
+}
+
+// ============================================================
+// Sparkline (inline mini chart)
+// ============================================================
+
+// Return a single-line sparkline string using block characters.
+// Since Urus outputs UTF-8, we use simple ASCII levels: _.-~^
+fn graph_sparkline(values: [float]): str {
+    let n: int = len(values);
+    if n == 0 {
+        return "";
+    }
+
+    let mut min_val: float = values[0];
+    let mut max_val: float = values[0];
+    for i in 1..n {
+        if values[i] < min_val { min_val = values[i]; }
+        if values[i] > max_val { max_val = values[i]; }
+    }
+
+    let range: float = if max_val > min_val { max_val - min_val } else { 1.0 };
+    let levels: [str] = ["_", ".", "-", "~", "^"];
+    let mut result: str = "";
+
+    for i in 0..n {
+        let norm: float = (values[i] - min_val) / range;
+        let mut idx: int = to_int(math_floor(norm * 4.0));
+        if idx > 4 { idx = 4; }
+        result = result + levels[idx];
+    }
+
+    return result;
+}
