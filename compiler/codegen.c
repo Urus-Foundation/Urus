@@ -130,6 +130,7 @@ static AstNode *find_generic_fn(AstNode *program, const char *name)
 
 // Stored program root for generic fn lookup during codegen
 static AstNode *_codegen_program = NULL;
+static bool _codegen_test_mode = false;
 
 // ---- Lambda tracking ----
 
@@ -901,6 +902,79 @@ static void gen_expr(CodeBuf *buf, AstNode *node)
             if (node->as.call.arg_count > 0)
                 gen_expr(buf, node->as.call.args[0]);
             emit(buf, ")");
+        } else if (fn_name && (strcmp(fn_name, "assert_eq") == 0 ||
+                                  strcmp(fn_name, "assert_ne") == 0)) {
+            bool is_eq = (strcmp(fn_name, "assert_eq") == 0);
+            AstType *t = node->as.call.args[0]->resolved_type;
+            if (t && t->kind == TYPE_STR) {
+                emit(buf, "do { urus_str *_a = ");
+                gen_expr(buf, node->as.call.args[0]);
+                emit(buf, "; urus_str *_b = ");
+                gen_expr(buf, node->as.call.args[1]);
+                if (is_eq) {
+                    emit(buf, "; if (strcmp(_a->data, _b->data) != 0) {"
+                         " fprintf(stderr, \"Assertion failed: "
+                         "assert_eq\\n  left:  %%s\\n  right: %%s\\n\","
+                         " _a->data, _b->data); exit(1); } } while(0)");
+                } else {
+                    emit(buf, "; if (strcmp(_a->data, _b->data) == 0) {"
+                         " fprintf(stderr, \"Assertion failed: "
+                         "assert_ne\\n  both: %%s\\n\","
+                         " _a->data); exit(1); } } while(0)");
+                }
+            } else if (t && t->kind == TYPE_FLOAT) {
+                emit(buf, "do { double _a = ");
+                gen_expr(buf, node->as.call.args[0]);
+                emit(buf, "; double _b = ");
+                gen_expr(buf, node->as.call.args[1]);
+                if (is_eq) {
+                    emit(buf, "; if (_a != _b) {"
+                         " fprintf(stderr, \"Assertion failed: "
+                         "assert_eq\\n  left:  %%g\\n  right: %%g\\n\","
+                         " _a, _b); exit(1); } } while(0)");
+                } else {
+                    emit(buf, "; if (_a == _b) {"
+                         " fprintf(stderr, \"Assertion failed: "
+                         "assert_ne\\n  both: %%g\\n\","
+                         " _a); exit(1); } } while(0)");
+                }
+            } else if (t && t->kind == TYPE_BOOL) {
+                emit(buf, "do { bool _a = ");
+                gen_expr(buf, node->as.call.args[0]);
+                emit(buf, "; bool _b = ");
+                gen_expr(buf, node->as.call.args[1]);
+                if (is_eq) {
+                    emit(buf, "; if (_a != _b) {"
+                         " fprintf(stderr, \"Assertion failed: "
+                         "assert_eq\\n  left:  %%s\\n  right: %%s\\n\","
+                         " _a?\"true\":\"false\","
+                         " _b?\"true\":\"false\"); exit(1); } } while(0)");
+                } else {
+                    emit(buf, "; if (_a == _b) {"
+                         " fprintf(stderr, \"Assertion failed: "
+                         "assert_ne\\n  both: %%s\\n\","
+                         " _a?\"true\":\"false\"); exit(1); } } while(0)");
+                }
+            } else {
+                // Default: int
+                emit(buf, "do { int64_t _a = ");
+                gen_expr(buf, node->as.call.args[0]);
+                emit(buf, "; int64_t _b = ");
+                gen_expr(buf, node->as.call.args[1]);
+                if (is_eq) {
+                    emit(buf, "; if (_a != _b) {"
+                         " fprintf(stderr, \"Assertion failed: "
+                         "assert_eq\\n  left:  %%lld\\n  right: %%lld\\n\","
+                         " (long long)_a, (long long)_b);"
+                         " exit(1); } } while(0)");
+                } else {
+                    emit(buf, "; if (_a == _b) {"
+                         " fprintf(stderr, \"Assertion failed: "
+                         "assert_ne\\n  both: %%lld\\n\","
+                         " (long long)_a);"
+                         " exit(1); } } while(0)");
+                }
+            }
         } else if (fn_name && strcmp(fn_name, "push") == 0) {
             // Determine element type from array arg's resolved_type
             AstType *elem = NULL;
@@ -2057,6 +2131,16 @@ void codegen_generate(CodeBuf *buf, AstNode *program)
             gen_fn_forward(buf, d);
         }
     }
+    // Test function forward declarations
+    {
+        int test_idx = 0;
+        for (int i = 0; i < program->as.program.decl_count; i++) {
+            AstNode *d = program->as.program.decls[i];
+            if (d->kind == NODE_TEST_DECL) {
+                emit(buf, "static void _urus_test_%d(void);\n", test_idx++);
+            }
+        }
+    }
     emit(buf, "\n");
 
     // Pass 3 (impl): forward declarations for impl methods
@@ -2191,6 +2275,19 @@ void codegen_generate(CodeBuf *buf, AstNode *program)
         }
     }
 
+    // Pass 4 (test): test function definitions
+    {
+        int test_idx = 0;
+        for (int i = 0; i < program->as.program.decl_count; i++) {
+            AstNode *d = program->as.program.decls[i];
+            if (d->kind == NODE_TEST_DECL) {
+                emit(buf, "static void _urus_test_%d(void) ", test_idx++);
+                gen_block(buf, d->as.test_decl.body);
+                emit(buf, "\n");
+            }
+        }
+    }
+
     // Pass 4b: emit monomorphized generic function specializations
     // We iterate with index because gen_mono_fn may add new instances
     for (int i = 0; i < mono_count; i++) {
@@ -2222,46 +2319,97 @@ void codegen_generate(CodeBuf *buf, AstNode *program)
         gen_mono_fn(buf, &mono_instances[i]);
     }
 
-    // C main wrapper — check if urus main accepts argc/argv
-    bool main_has_args = false;
-    for (int i = 0; i < program->as.program.decl_count; i++) {
-        AstNode *d = program->as.program.decls[i];
-        if (d->kind == NODE_FN_DECL &&
-            strcmp(d->as.fn_decl.name, "main") == 0) {
-            main_has_args = d->as.fn_decl.param_count >= 2;
-            break;
-        }
-    }
-
-    if (main_has_args) {
-        emit(buf, "int main(int argc, char **argv) {\n");
-    } else {
+    if (_codegen_test_mode) {
+        // Test runner main
         emit(buf, "int main() {\n");
-    }
-
-    // Initialize string constants
-    for (int i = 0; i < program->as.program.decl_count; i++) {
-        AstNode *d = program->as.program.decls[i];
-        if (d->kind == NODE_CONST_DECL &&
-            d->as.const_decl.value->kind == NODE_STR_LIT) {
-            emit(buf, "   %s = urus_str_from(\"%s\");\n", d->as.const_decl.name,
-                 d->as.const_decl.value->as.str_lit.value);
+        // Initialize string constants
+        for (int i = 0; i < program->as.program.decl_count; i++) {
+            AstNode *d = program->as.program.decls[i];
+            if (d->kind == NODE_CONST_DECL &&
+                d->as.const_decl.value->kind == NODE_STR_LIT) {
+                emit(buf, "   %s = urus_str_from(\"%s\");\n",
+                     d->as.const_decl.name,
+                     d->as.const_decl.value->as.str_lit.value);
+            }
         }
-    }
-
-    if (main_has_args) {
-        emit(buf, "   urus_array *_urus_argv = urus_array_new(sizeof(urus_str "
-                  "*), (size_t)argc, (urus_drop_fn)urus_str_drop);\n"
-                  "   for (int i = 0; i < argc; i++) {\n"
-                  "       urus_str *s = urus_str_from(argv[i]);\n"
-                  "       urus_array_push(_urus_argv, &s);\n"
-                  "   }\n"
-                  "   urus_main((int64_t)argc, _urus_argv);\n"
-                  "   urus_array_drop(&_urus_argv);\n");
+        // Count tests
+        int test_count = 0;
+        for (int i = 0; i < program->as.program.decl_count; i++) {
+            if (program->as.program.decls[i]->kind == NODE_TEST_DECL)
+                test_count++;
+        }
+        emit(buf, "   int _passed = 0, _failed = 0;\n");
+        emit(buf, "   fprintf(stderr, \"Running %d tests...\\n\");\n",
+             test_count);
+        int test_idx = 0;
+        for (int i = 0; i < program->as.program.decl_count; i++) {
+            AstNode *d = program->as.program.decls[i];
+            if (d->kind == NODE_TEST_DECL) {
+                char *escaped = d->as.test_decl.name;
+                emit(buf,
+                     "   fprintf(stderr, \"  test \\\"%s\\\"... \");\n",
+                     escaped);
+                emit(buf, "   _urus_test_%d();\n", test_idx);
+                emit(buf, "   fprintf(stderr, \"PASSED\\n\");\n");
+                emit(buf, "   _passed++;\n");
+                test_idx++;
+            }
+        }
+        emit(buf, "   fprintf(stderr, \"\\nResults: %%d passed, "
+                  "%%d failed\\n\", _passed, _failed);\n");
+        emit(buf, "   return _failed > 0 ? 1 : 0;\n");
+        emit(buf, "}\n");
     } else {
-        emit(buf, "   urus_main();\n");
-    }
+        // C main wrapper — check if urus main accepts argc/argv
+        bool main_has_args = false;
+        for (int i = 0; i < program->as.program.decl_count; i++) {
+            AstNode *d = program->as.program.decls[i];
+            if (d->kind == NODE_FN_DECL &&
+                strcmp(d->as.fn_decl.name, "main") == 0) {
+                main_has_args = d->as.fn_decl.param_count >= 2;
+                break;
+            }
+        }
 
-    emit(buf, "   return 0;\n"
-              "}\n");
+        if (main_has_args) {
+            emit(buf, "int main(int argc, char **argv) {\n");
+        } else {
+            emit(buf, "int main() {\n");
+        }
+
+        // Initialize string constants
+        for (int i = 0; i < program->as.program.decl_count; i++) {
+            AstNode *d = program->as.program.decls[i];
+            if (d->kind == NODE_CONST_DECL &&
+                d->as.const_decl.value->kind == NODE_STR_LIT) {
+                emit(buf, "   %s = urus_str_from(\"%s\");\n",
+                     d->as.const_decl.name,
+                     d->as.const_decl.value->as.str_lit.value);
+            }
+        }
+
+        if (main_has_args) {
+            emit(buf,
+                 "   urus_array *_urus_argv = urus_array_new(sizeof(urus_str "
+                 "*), (size_t)argc, (urus_drop_fn)urus_str_drop);\n"
+                 "   for (int i = 0; i < argc; i++) {\n"
+                 "       urus_str *s = urus_str_from(argv[i]);\n"
+                 "       urus_array_push(_urus_argv, &s);\n"
+                 "   }\n"
+                 "   urus_main((int64_t)argc, _urus_argv);\n"
+                 "   urus_array_drop(&_urus_argv);\n");
+        } else {
+            emit(buf, "   urus_main();\n");
+        }
+
+        emit(buf, "   return 0;\n"
+                  "}\n");
+    }
+}
+
+void codegen_generate_tests(CodeBuf *buf, AstNode *program)
+{
+    _codegen_test_mode = true;
+    codegen_generate(buf, program);
+    _codegen_test_mode = false;
 }

@@ -76,6 +76,8 @@ const BuiltinMap urus_builtin_direct_maps[] = {
     {"append_file", "urus_append_file"},
     {"exit", "urus_exit"},
     {"assert", "urus_assert"},
+    {"assert_eq", "urus_assert_eq"},
+    {"assert_ne", "urus_assert_ne"},
     {"len", "urus_len"},
     {"pop", "urus_pop"},
     {"is_ok", "urus_result_is_ok"},
@@ -131,6 +133,8 @@ void sema_register_builtins(SemaScope *global)
 
     add_builtin(global, "exit", T_VOID, 1, "code", T_INT);
     add_builtin(global, "assert", T_VOID, 2, "cond", T_BOOL, "msg", T_STR);
+    add_builtin(global, "assert_eq", T_VOID, 2, "a", T_ANY, "b", T_ANY);
+    add_builtin(global, "assert_ne", T_VOID, 2, "a", T_ANY, "b", T_ANY);
 
     add_builtin(global, "is_ok", T_BOOL, 1, "r", T_ANY);
     add_builtin(global, "is_err", T_BOOL, 1, "r", T_ANY);

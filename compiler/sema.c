@@ -1594,6 +1594,20 @@ bool sema_analyze(AstNode *program, const char *filename)
             scope_free(fn_scope);
             ctx.current_fn_name = "";
         }
+        // Check test declaration bodies
+        if (d->kind == NODE_TEST_DECL) {
+            SemaScope *test_scope = scope_new(global);
+            ctx.current = test_scope;
+            ctx.current_fn_name = d->as.test_decl.name;
+            ctx.current_fn_return = ast_type_simple(TYPE_VOID);
+            AstNode *body = d->as.test_decl.body;
+            for (int j = 0; j < body->as.block.stmt_count; j++) {
+                check_stmt(&ctx, body->as.block.stmts[j]);
+            }
+            ctx.current = global;
+            scope_free(test_scope);
+            ctx.current_fn_name = "";
+        }
         // Check impl block method bodies
         if (d->kind == NODE_IMPL_BLOCK) {
             for (int j = 0; j < d->as.impl_block.method_count; j++) {

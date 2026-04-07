@@ -1971,6 +1971,19 @@ static AstNode *parse_impl_block(Parser *p)
     return n;
 }
 
+static AstNode *parse_test_decl(Parser *p)
+{
+    Token tok = advance_tok(p); // consume 'test'
+    if (!check(p, TOK_STR_LIT)) {
+        error_at(p, current(p), "expected test name string");
+    }
+    Token name_tok = advance_tok(p);
+    AstNode *n = ast_new(NODE_TEST_DECL, tok);
+    n->as.test_decl.name = tok_str_value(name_tok);
+    n->as.test_decl.body = parse_block(p);
+    return n;
+}
+
 static AstNode *parse_declaration(Parser *p)
 {
     if (check(p, TOK_ASYNC)) {
@@ -1999,6 +2012,8 @@ static AstNode *parse_declaration(Parser *p)
         return parse_trait_decl(p);
     if (check(p, TOK_IMPL))
         return parse_impl_block(p);
+    if (check(p, TOK_TEST))
+        return parse_test_decl(p);
     return parse_statement(p);
 }
 

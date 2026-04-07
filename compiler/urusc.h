@@ -134,6 +134,7 @@ typedef enum {
     NODE_TYPE_ALIAS,
     NODE_TRAIT_DECL,
     NODE_IMPL_BLOCK,
+    NODE_TEST_DECL,
 
     // Statements
     NODE_BLOCK,
@@ -503,6 +504,12 @@ struct AstNode {
         struct {
             AstNode *expr;
         } await_expr;
+
+        // NODE_TEST_DECL
+        struct {
+            char *name;
+            AstNode *body; // block
+        } test_decl;
     } as;
 
     // Filled by semantic analysis
@@ -670,6 +677,7 @@ typedef struct {
 void codegen_init(CodeBuf *buf);
 void codegen_free(CodeBuf *buf);
 void codegen_generate(CodeBuf *buf, AstNode *program);
+void codegen_generate_tests(CodeBuf *buf, AstNode *program);
 
 //
 // MISC

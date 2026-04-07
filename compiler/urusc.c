@@ -125,6 +125,7 @@ int main(int argc, char **argv)
     bool show_ast = false;
     bool emit_c = false;
     bool run_after = false;
+    bool run_tests = false;
     const char *output = NULL;
 
     int arg_start = 1;
@@ -132,6 +133,10 @@ int main(int argc, char **argv)
     if (argc >= 2 && strcmp(argv[1], "pkg") == 0) {
         return pkg_main(argc, argv);
     } else if (argc >= 2 && strcmp(argv[1], "run") == 0) {
+        run_after = true;
+        arg_start = 2;
+    } else if (argc >= 2 && strcmp(argv[1], "test") == 0) {
+        run_tests = true;
         run_after = true;
         arg_start = 2;
     } else if (argc >= 2 && strcmp(argv[1], "build") == 0) {
@@ -154,6 +159,10 @@ int main(int argc, char **argv)
                 show_ast = true;
             else if (strcmp(argv[i], "--emit-c") == 0)
                 emit_c = true;
+            else if (strcmp(argv[i], "--test") == 0) {
+                run_tests = true;
+                run_after = true;
+            }
             else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc)
                 output = argv[++i];
             else {
@@ -222,7 +231,10 @@ int main(int argc, char **argv)
     // Code generation
     CodeBuf cbuf;
     codegen_init(&cbuf);
-    codegen_generate(&cbuf, program);
+    if (run_tests)
+        codegen_generate_tests(&cbuf, program);
+    else
+        codegen_generate(&cbuf, program);
 
     if (emit_c) {
         printf("%s", cbuf.data);
