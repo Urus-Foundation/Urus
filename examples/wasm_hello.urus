@@ -1,0 +1,16 @@
+// WebAssembly hello world example
+// Compile: urusc wasm_hello.urus --target wasm
+// Or WASI: urusc wasm_hello.urus --target wasi -o hello.wasm
+
+fn fibonacci(n: int): int {
+    if n <= 1 {
+        return n;
+    }
+    return fibonacci(n - 1) + fibonacci(n - 2);
+}
+
+fn main(): void {
+    print("Hello from Urus on WebAssembly!");
+    print(f"Fibonacci(10) = {fibonacci(10)}");
+    print(f"Fibonacci(20) = {fibonacci(20)}");
+}

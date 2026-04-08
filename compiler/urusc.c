@@ -89,17 +89,23 @@ static void show_help(char *progname)
         "  --tokens    Display Lexer tokens\n"
         "  --ast       Display the Abstract Syntax Tree (AST)\n"
         "  --emit-c    Print generated C code to stdout\n"
+        "  --target T  Set compilation target (wasm, wasi)\n"
         "  -o <file>   Specify output executable name (default: "
 #ifdef _WIN32
         "a.exe)\n\n"
 #else
         "a.out)\n\n"
 #endif
+        "Targets:\n"
+        "  wasm        WebAssembly for browsers (emits .html + .js + .wasm)\n"
+        "  wasi        Standalone WASM for runtimes like wasmtime/wasmer\n\n"
         "Examples:\n"
         "  %s main.urus -o app\n"
         "  %s build main.urus -o app\n"
-        "  %s run main.urus\n",
-        progname, progname, progname, progname);
+        "  %s run main.urus\n"
+        "  %s main.urus --target wasm\n"
+        "  %s main.urus --target wasi -o app.wasm\n",
+        progname, progname, progname, progname, progname, progname);
 }
 
 static void show_version(void)
@@ -126,6 +132,7 @@ int main(int argc, char **argv)
     bool emit_c = false;
     bool run_after = false;
     const char *output = NULL;
+    const char *target = NULL; // "wasm" or "wasi"
 
     int arg_start = 1;
     // Check for subcommand
@@ -156,6 +163,17 @@ int main(int argc, char **argv)
                 emit_c = true;
             else if (strcmp(argv[i], "-o") == 0 && i + 1 < argc)
                 output = argv[++i];
+            else if (strcmp(argv[i], "--target") == 0 && i + 1 < argc) {
+                target = argv[++i];
+                if (strcmp(target, "wasm") != 0 &&
+                    strcmp(target, "wasi") != 0) {
+                    fprintf(stderr,
+                            "%s: error: unknown target '%s'"
+                            " (supported: wasm, wasi)\n",
+                            argv[0], target);
+                    return 1;
+                }
+            }
             else {
                 fprintf(stderr, "%s: error: invalid option %s\n", argv[0],
                         argv[i]);
@@ -237,12 +255,21 @@ int main(int argc, char **argv)
                  (int)getpid());
 #endif
         const char *c_path = c_path_buf;
+
+        const char *out_path;
+        if (output) {
+            out_path = output;
+        } else if (target && strcmp(target, "wasm") == 0) {
+            out_path = "a.html";
+        } else if (target && strcmp(target, "wasi") == 0) {
+            out_path = "a.wasm";
+        } else {
 #ifdef _WIN32
-        const char *default_out = run_after ? "_urus_run.exe" : "a.exe";
+            out_path = run_after ? "_urus_run.exe" : "a.exe";
 #else
-        const char *default_out = run_after ? "_urus_run" : "a.out";
+            out_path = run_after ? "_urus_run" : "a.out";
 #endif
-        const char *out_path = output ? output : default_out;
+        }
 
         FILE *f = fopen(c_path, "wb");
         if (!f) {
@@ -253,7 +280,50 @@ int main(int argc, char **argv)
         fwrite(cbuf.data, 1, cbuf.len, f);
         fclose(f);
 
-        const char *gcc_path = find_gcc();
+        const char *compiler_cmd;
+        bool is_wasm = target && (strcmp(target, "wasm") == 0 ||
+                                  strcmp(target, "wasi") == 0);
+
+        if (is_wasm) {
+            // Use emscripten
+            compiler_cmd = getenv("EMCC");
+            if (!compiler_cmd) compiler_cmd = "emcc";
+        } else {
+            compiler_cmd = find_gcc();
+        }
+
+        // WASM target: use emcc with appropriate flags
+        if (is_wasm) {
+            char cmd[8192];
+            if (target && strcmp(target, "wasi") == 0) {
+                snprintf(cmd, sizeof(cmd),
+                         "%s -std=c11 -O2 -o \"%s\" \"%s\" -lm"
+                         " -DURUS_WASM"
+                         " -s STANDALONE_WASM",
+                         compiler_cmd, out_path, c_path);
+            } else {
+                // wasm target — generate .html + .js + .wasm
+                snprintf(cmd, sizeof(cmd),
+                         "%s -std=c11 -O2 -o \"%s\" \"%s\" -lm"
+                         " -DURUS_WASM"
+                         " -s EXPORTED_RUNTIME_METHODS=[\"ccall\",\"cwrap\"]"
+                         " -s ALLOW_MEMORY_GROWTH=1",
+                         compiler_cmd, out_path, c_path);
+            }
+            fprintf(stderr, "Compiling (WASM): %s\n", cmd);
+            int ret = system(cmd);
+            remove(c_path);
+            if (ret != 0) {
+                fprintf(stderr, "WASM compilation failed.\n");
+                fprintf(stderr, "Make sure Emscripten (emcc) is installed"
+                        " and in your PATH.\n");
+                codegen_free(&cbuf);
+                goto cleanup_err;
+            }
+            fprintf(stderr, "WASM output: %s\n", out_path);
+            codegen_free(&cbuf);
+            goto cleanup;
+        }
 
 #ifdef _WIN32
         // Ensure TMP/TEMP point to a valid Windows temp directory
@@ -267,14 +337,14 @@ int main(int argc, char **argv)
 
         // Ensure GCC's bin directory is in PATH so cc1 can be found
         {
-            const char *last_slash = strrchr(gcc_path, '/');
+            const char *last_slash = strrchr(compiler_cmd, '/');
             if (!last_slash)
-                last_slash = strrchr(gcc_path, '\\');
+                last_slash = strrchr(compiler_cmd, '\\');
             if (last_slash) {
-                size_t dir_len = (size_t)(last_slash - gcc_path);
+                size_t dir_len = (size_t)(last_slash - compiler_cmd);
                 char gcc_dir[4096];
                 snprintf(gcc_dir, sizeof(gcc_dir), "%.*s", (int)dir_len,
-                         gcc_path);
+                         compiler_cmd);
                 const char *old_path = getenv("PATH");
                 char new_path[16384];
                 snprintf(new_path, sizeof(new_path), "%s;%s", gcc_dir,
@@ -286,21 +356,21 @@ int main(int argc, char **argv)
         // Runtime header is embedded in generated C, no -I needed
         char cmd[8192];
         snprintf(cmd, sizeof(cmd), "\"%s\" -std=c11 -O2 -o \"%s\" \"%s\" -lm",
-                 gcc_path, out_path, c_path);
+                 compiler_cmd, out_path, c_path);
         fprintf(stderr, "Compiling: %s\n", cmd);
 
         // Use _spawnl for reliable execution on Windows
-        int ret = (int)_spawnl(_P_WAIT, gcc_path, "gcc", "-std=c11", "-O2",
-                               "-o", out_path, c_path, "-lm", NULL);
+        int ret = (int)_spawnl(_P_WAIT, compiler_cmd, "gcc", "-std=c11",
+                               "-O2", "-o", out_path, c_path, "-lm", NULL);
 #else
         // Use fork/execvp to avoid shell injection via system()
-        fprintf(stderr, "Compiling: %s -std=c11 -O2 -o %s %s -lm\n", gcc_path,
-                out_path, c_path);
+        fprintf(stderr, "Compiling: %s -std=c11 -O2 -o %s %s -lm\n",
+                compiler_cmd, out_path, c_path);
         int ret;
         pid_t pid = fork();
         if (pid == 0) {
-            execlp(gcc_path, "gcc", "-std=c11", "-O2", "-o", out_path, c_path,
-                   "-lm", (char *)NULL);
+            execlp(compiler_cmd, "gcc", "-std=c11", "-O2", "-o", out_path,
+                   c_path, "-lm", (char *)NULL);
             _exit(127); // exec failed
         } else if (pid < 0) {
             ret = -1;
@@ -358,6 +428,7 @@ int main(int argc, char **argv)
     ast_free(program);
     xfree(tokens);
     xfree(source);
+cleanup:
     return 0;
 
 cleanup_err:
