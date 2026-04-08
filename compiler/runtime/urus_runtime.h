@@ -754,7 +754,91 @@ static void _urus_throw(urus_str *err) {
 // Async/Await (thread-based futures)
 // ============================================================
 
-#ifdef _WIN32
+#ifdef URUS_WASM
+// WASM: No threading support — async runs synchronously
+typedef struct {
+    void *result;
+    size_t result_size;
+    bool done;
+} urus_future;
+
+static urus_future *urus_future_new(void) {
+    urus_future *f = (urus_future *)urus_alloc(sizeof(urus_future));
+    f->result = NULL;
+    f->result_size = 0;
+    f->done = false;
+    return f;
+}
+
+// In WASM, "launch" just runs the function synchronously
+#define URUS_FUTURE_LAUNCH(future, func, arg) \
+    do { func(arg); } while(0)
+
+static void urus_future_await(urus_future *f) {
+    (void)f; // already done
+}
+
+static int64_t urus_future_get_int(urus_future *f) {
+    int64_t v = 0;
+    if (f->result) memcpy(&v, f->result, sizeof(v));
+    return v;
+}
+
+static double urus_future_get_float(urus_future *f) {
+    double v = 0;
+    if (f->result) memcpy(&v, f->result, sizeof(v));
+    return v;
+}
+
+static bool urus_future_get_bool(urus_future *f) {
+    bool v = false;
+    if (f->result) memcpy(&v, f->result, sizeof(v));
+    return v;
+}
+
+static urus_str *urus_future_get_str(urus_future *f) {
+    urus_str *v = NULL;
+    if (f->result) memcpy(&v, f->result, sizeof(v));
+    return v;
+}
+
+static void *urus_future_get_ptr(urus_future *f) {
+    void *v = NULL;
+    if (f->result) memcpy(&v, f->result, sizeof(v));
+    return v;
+}
+
+static void urus_future_set_int(urus_future *f, int64_t v) {
+    f->result = urus_alloc(sizeof(v));
+    memcpy(f->result, &v, sizeof(v));
+    f->done = true;
+}
+
+static void urus_future_set_float(urus_future *f, double v) {
+    f->result = urus_alloc(sizeof(v));
+    memcpy(f->result, &v, sizeof(v));
+    f->done = true;
+}
+
+static void urus_future_set_bool(urus_future *f, bool v) {
+    f->result = urus_alloc(sizeof(v));
+    memcpy(f->result, &v, sizeof(v));
+    f->done = true;
+}
+
+static void urus_future_set_str(urus_future *f, urus_str *v) {
+    f->result = urus_alloc(sizeof(v));
+    memcpy(f->result, &v, sizeof(v));
+    f->done = true;
+}
+
+static void urus_future_set_ptr(urus_future *f, void *v) {
+    f->result = urus_alloc(sizeof(v));
+    memcpy(f->result, &v, sizeof(v));
+    f->done = true;
+}
+
+#elif defined(_WIN32)
 #include <windows.h>
 #include <process.h>
 
