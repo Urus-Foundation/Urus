@@ -1,31 +1,28 @@
 # URUS Language Specification v0.3.0
 
-## Overview
+URUS is a statically-typed, compiled programming language that transpiles to standard C11. Memory is managed automatically via reference counting.
 
-URUS is a statically-typed, compiled programming language that transpiles to standard C11.
-Memory is managed automatically via reference counting.
-
-## Syntax Style
-
-C-like: curly braces for blocks, semicolons as statement terminators.
+**Syntax style:** C-like — curly braces for blocks, semicolons as statement terminators.
 
 ---
 
 ## 1. Primitive Types
 
-| Type    | Description              | C equivalent     |
-|---------|--------------------------|-------------------|
-| `int`   | 64-bit signed integer    | `int64_t`         |
-| `float` | 64-bit floating point    | `double`          |
-| `bool`  | Boolean                  | `bool` (stdbool)  |
-| `str`   | UTF-8 string (ref-counted) | `urus_str*`     |
-| `void`  | No value (return type)   | `void`            |
+| Type | Description | C Equivalent |
+|------|-------------|--------------|
+| `int` | 64-bit signed integer | `int64_t` |
+| `float` | 64-bit floating point | `double` |
+| `bool` | Boolean (`true` / `false`) | `bool` |
+| `str` | UTF-8 string (ref-counted) | `urus_str*` |
+| `void` | No value (return type only) | `void` |
+
+---
 
 ## 2. Composite Types
 
 ### Arrays
 
-```
+```rust
 let nums: [int] = [1, 2, 3];
 let names: [str] = ["Alice", "Bob"];
 ```
@@ -34,17 +31,17 @@ Dynamic, growable, ref-counted. Supported element types: `int`, `float`, `bool`,
 
 ### Tuples
 
-```
+```rust
 let t: (int, str) = (42, "hello");
 print(t.0);    // 42
 print(t.1);    // hello
 ```
 
-Stack-allocated compound types. Access elements by index: `.0`, `.1`, `.2`, etc. Tuples containing heap types (str, arrays) are properly cleaned up via generated drop functions.
+Stack-allocated compound types. Access elements by index: `.0`, `.1`, `.2`, etc. Tuples containing heap types (`str`, arrays) are properly cleaned up via generated drop functions.
 
 ### Result Type
 
-```
+```rust
 Result<T, E>
 ```
 
@@ -58,18 +55,20 @@ See [Section 8](#8-structs).
 
 See [Section 9](#9-enums--tagged-unions).
 
+---
+
 ## 3. Variables
 
 ### Immutable (default)
 
-```
+```rust
 let x: int = 10;
 let name: str = "hello";
 ```
 
 ### Mutable
 
-```
+```rust
 let mut count: int = 0;
 count = count + 1;
 ```
@@ -78,7 +77,7 @@ count = count + 1;
 
 Type annotation is optional when the type can be inferred from the initializer:
 
-```
+```rust
 let x = 42;           // inferred as int
 let pi = 3.14;        // inferred as float
 let name = "hello";   // inferred as str
@@ -87,36 +86,42 @@ let flag = true;      // inferred as bool
 
 ### Tuple Destructuring
 
-```
+```rust
 let (x, y): (int, str) = get_pair();
 let (a, b) = (1, "two");
 ```
 
+---
+
 ## 4. Constants
 
-```
+```rust
 const MAX_SIZE: int = 100;
 const PI: float = 3.14159;
 const APP_NAME: str = "MyApp";
 const DEBUG: bool = false;
 ```
 
-Compile-time constants. Types supported: `int`, `float`, `bool`, `str`.
+Compile-time constants. Supported types: `int`, `float`, `bool`, `str`.
+
+---
 
 ## 5. Type Aliases
 
-```
+```rust
 type ID = int;
 type Name = str;
 type Numbers = [int];
 type Pair = (int, str);
 ```
 
-Creates a semantic alias for an existing type. The alias is interchangeable with the original type.
+Creates a semantic alias for an existing type. The alias is fully interchangeable with the original.
+
+---
 
 ## 6. Functions
 
-```
+```rust
 fn add(a: int, b: int): int {
     return a + b;
 }
@@ -126,13 +131,13 @@ fn greet(name: str): void {
 }
 ```
 
-- Return type after `:` following parameter list.
-- `void` can be omitted: `fn greet(name: str) { ... }` is valid.
-- No function overloading.
+- Return type follows `:` after the parameter list
+- `void` can be omitted: `fn greet(name: str) { ... }` is valid
+- No function overloading
 
 ### Entry Point
 
-```
+```rust
 fn main(): void {
     // program starts here
 }
@@ -140,7 +145,7 @@ fn main(): void {
 
 ### Default Parameters
 
-```
+```rust
 fn greet(name: str = "World"): void {
     print(f"Hello {name}!");
 }
@@ -148,18 +153,20 @@ fn greet(name: str = "World"): void {
 
 ### Mutable Parameters
 
-```
+```rust
 fn increment(mut x: int): int {
     x += 1;
     return x;
 }
 ```
 
+---
+
 ## 7. Control Flow
 
 ### If / Else
 
-```
+```rust
 if x > 10 {
     print("big");
 } else if x > 5 {
@@ -169,13 +176,13 @@ if x > 10 {
 }
 ```
 
-No parentheses required around condition (but allowed).
+No parentheses required around the condition (but allowed).
 
 ### If-Expressions
 
 `if` can be used as an expression that returns a value:
 
-```
+```rust
 let label = if x > 5 { "big" } else { "small" };
 print(if x > 0 { "positive" } else { "negative" });
 ```
@@ -184,7 +191,7 @@ Compiles to C ternary operator.
 
 ### While Loop
 
-```
+```rust
 while x < 100 {
     x = x + 1;
 }
@@ -192,7 +199,7 @@ while x < 100 {
 
 ### Do-While Loop
 
-```
+```rust
 do {
     x += 1;
 } while x < 100;
@@ -200,7 +207,7 @@ do {
 
 ### For Loop (Range)
 
-```
+```rust
 for i in 0..10 {       // exclusive: 0 to 9
     print(i);
 }
@@ -212,7 +219,7 @@ for i in 0..=10 {      // inclusive: 0 to 10
 
 ### For-each Loop
 
-```
+```rust
 let names: [str] = ["Alice", "Bob"];
 for name in names {
     print(name);
@@ -221,7 +228,7 @@ for name in names {
 
 ### Tuple Destructuring in For-each
 
-```
+```rust
 let pairs: [(int, str)] = [(1, "a"), (2, "b")];
 for (k, v) in pairs {
     print(f"{k}: {v}");
@@ -230,7 +237,7 @@ for (k, v) in pairs {
 
 ### Break / Continue
 
-```
+```rust
 while true {
     if done {
         break;
@@ -241,9 +248,11 @@ while true {
 
 Validated to only appear inside loops.
 
+---
+
 ## 8. Structs
 
-```
+```rust
 struct Point {
     x: float;
     y: float;
@@ -259,7 +268,7 @@ fn main(): void {
 
 Create a new struct by copying fields from an existing instance and overriding specific fields:
 
-```
+```rust
 let p1: Point = Point { x: 1.0, y: 2.0 };
 let p2: Point = Point { x: 10.0, ..p1 };  // y copied from p1
 ```
@@ -268,9 +277,11 @@ let p2: Point = Point { x: 10.0, ..p1 };  // y copied from p1
 
 See [Section 25](#25-impl-blocks--methods).
 
+---
+
 ## 9. Enums / Tagged Unions
 
-```
+```rust
 enum Color {
     Red;
     Green;
@@ -285,14 +296,16 @@ enum Shape {
 }
 ```
 
-- Variants can be unit (no data) or carry fields.
-- Construct with `EnumName.Variant` or `EnumName.Variant(args)`.
+- Variants can be unit (no data) or carry fields
+- Construct with `EnumName.Variant` or `EnumName.Variant(args)`
+
+---
 
 ## 10. Pattern Matching
 
 ### On Enums
 
-```
+```rust
 fn describe(s: Shape): str {
     match s {
         Shape.Circle(r) => {
@@ -315,7 +328,7 @@ Arms bind variant fields as local variables.
 
 Match also works with `int`, `str`, and `bool`:
 
-```
+```rust
 fn describe(n: int): void {
     match n {
         0 => { print("zero"); }
@@ -342,9 +355,11 @@ fn check(b: bool): void {
 
 The `_` wildcard matches any unmatched value.
 
+---
+
 ## 11. Defer
 
-```
+```rust
 fn process(): void {
     print("start");
     defer { print("cleanup"); }
@@ -353,46 +368,52 @@ fn process(): void {
 }
 ```
 
-- Defer bodies execute in LIFO (Last-In-First-Out) order.
-- Runs before every return path.
+- Defer bodies execute in LIFO (Last-In-First-Out) order
+- Runs before every return path
+
+---
 
 ## 12. Runes (Macros)
 
-```
+```rust
 rune square(x) { x * x }
 rune max(a, b) { if a > b { a } else { b } }
 ```
 
 Invocation uses the `!` suffix:
 
-```
+```rust
 fn main(): void {
     print(square!(5));       // 25
     print(max!(10, 20));     // 20
 }
 ```
 
-- Runes expand at compile time by textual substitution.
-- No type checking during definition — only at expansion site.
-- Statement-level runes (bodies with semicolons) expand as statement blocks.
+- Runes expand at compile time by textual substitution
+- No type checking during definition — only at expansion site
+- Statement-level runes (bodies with semicolons) expand as statement blocks
+
+---
 
 ## 13. String Interpolation
 
-```
+```rust
 let name: str = "World";
 let count: int = 42;
 print(f"Hello {name}! Count is {count}.");
 ```
 
-- `f"..."` strings can contain `{expr}` blocks.
-- Expressions are converted via `to_str()` and concatenated.
-- Use `{{` and `}}` for literal braces.
+- `f"..."` strings can contain `{expr}` blocks
+- Expressions are converted via `to_str()` and concatenated
+- Use `{{` and `}}` for literal braces
+
+---
 
 ## 14. Error Handling
 
 ### Result Type
 
-```
+```rust
 fn divide(a: int, b: int): Result<int, str> {
     if b == 0 {
         return Err("division by zero");
@@ -410,15 +431,15 @@ fn main(): void {
 }
 ```
 
-- `Result<T, E>` is a tagged union with `Ok(T)` and `Err(E)` variants.
-- Built-in functions: `is_ok()`, `is_err()`, `unwrap()`, `unwrap_err()`.
-- `unwrap()` on an Err or `unwrap_err()` on an Ok aborts with an error message.
+- `Result<T, E>` is a tagged union with `Ok(T)` and `Err(E)` variants
+- Built-in functions: `is_ok()`, `is_err()`, `unwrap()`, `unwrap_err()`
+- `unwrap()` on an `Err` or `unwrap_err()` on an `Ok` aborts with an error message
 
 ### Error Propagation (`?` operator)
 
 The `?` operator propagates errors from `Result` values. If the value is `Err`, it returns early with the error; if `Ok`, it unwraps the value:
 
-```
+```rust
 fn compute(x: int): Result<int, str> {
     let val: int = divide(x, 2)?;
     let val2: int = divide(val, 0)?;
@@ -428,7 +449,7 @@ fn compute(x: int): Result<int, str> {
 
 ### Try-Catch
 
-```
+```rust
 try {
     let result: int = compute(10)?;
     print(result);
@@ -437,61 +458,78 @@ try {
 }
 ```
 
-- Inside a `try` block, `?` throws to the nearest `catch` block.
-- Outside a `try` block, `?` returns `Err` from the enclosing function.
-- Implementation uses `setjmp`/`longjmp` with thread-local try stacks.
+- Inside a `try` block, `?` throws to the nearest `catch` block
+- Outside a `try` block, `?` returns `Err` from the enclosing function
+- Implementation uses `setjmp`/`longjmp` with thread-local try stacks
+
+---
 
 ## 15. Modules / Imports
 
-```
+```rust
 import "math_utils.urus";
 ```
 
-- Imports are resolved relative to the importing file's directory.
-- Standard library imports search via `URUSCPATH` environment variable.
-- Circular imports are detected and rejected.
-- All top-level declarations from imported files are merged into the program.
+- Imports are resolved relative to the importing file's directory
+- Standard library imports search via `URUSCPATH` environment variable
+- Circular imports are detected and rejected
+- All top-level declarations from imported files are merged into the program
+
+---
 
 ## 16. Raw Emit
 
-```
+```rust
 __emit__("printf(\"raw C!\\n\");");
 ```
 
 Inline C code directly into the generated output. Bypasses all type and safety checks.
 
+---
+
 ## 17. Operators
 
 ### Arithmetic
+
 `+`, `-`, `*`, `/`, `%`
 
 ### Exponentiation
+
 `**` — power operator
 
 ### Floored Remainder
+
 `%%` — always-positive remainder
 
 ### Comparison
+
 `==`, `!=`, `<`, `>`, `<=`, `>=`
 
 ### Logical
+
 `&&`, `||`, `!`
 
 ### Bitwise
+
 `&`, `|`, `^`, `~`, `<<`, `>>`, `&~` (AND-NOT)
 
 ### Assignment
+
 `=`, `+=`, `-=`, `*=`, `/=`, `%=`, `&=`, `|=`, `^=`, `<<=`, `>>=`
 
 ### Increment / Decrement
+
 `++`, `--` (prefix and postfix)
 
 ### String Concatenation
+
 `+` for strings: `"hello" + " world"`
+
+---
 
 ## 18. Numeric Literals
 
-```
+```rust
 42              // integer
 3.14            // float
 1_000_000       // numeric separators
@@ -502,38 +540,44 @@ Inline C code directly into the generated output. Bypasses all type and safety c
 1.5e-10         // scientific notation
 ```
 
-## 19. String Methods (Method-call Syntax)
+---
 
-Strings and arrays support method-call syntax as an alternative to free functions:
+## 19. Method-call Syntax
 
-```
+Strings and arrays support method-call syntax as an alternative to free functions.
+
+### String Methods
+
+```rust
 let s: str = "  Hello World  ";
-s.trim()            // str_trim(s)
-s.upper()           // str_upper(s)
-s.lower()           // str_lower(s)
-s.contains("World") // str_contains(s, "World")
-s.find("World")     // str_find(s, "World")
-s.len()             // str_len(s)
-s.slice(2, 7)       // str_slice(s, 2, 7)
-s.replace("o", "0") // str_replace(s, "o", "0")
-s.starts_with("  H") // str_starts_with(s, "  H")
-s.ends_with("  ")   // str_ends_with(s, "  ")
-s.split(" ")        // str_split(s, " ")
-s.char_at(0)        // char_at(s, 0)
+s.trim()              // str_trim(s)
+s.upper()             // str_upper(s)
+s.lower()             // str_lower(s)
+s.contains("World")   // str_contains(s, "World")
+s.find("World")       // str_find(s, "World")
+s.len()               // str_len(s)
+s.slice(2, 7)         // str_slice(s, 2, 7)
+s.replace("o", "0")   // str_replace(s, "o", "0")
+s.starts_with("  H")  // str_starts_with(s, "  H")
+s.ends_with("  ")     // str_ends_with(s, "  ")
+s.split(" ")          // str_split(s, " ")
+s.char_at(0)          // char_at(s, 0)
 ```
 
-Arrays:
+### Array Methods
 
-```
+```rust
 let mut arr: [int] = [1, 2, 3];
-arr.len()           // len(arr)
-arr.push(4)         // push(arr, 4)
-arr.pop()           // pop(arr)
+arr.len()             // len(arr)
+arr.push(4)           // push(arr, 4)
+arr.pop()             // pop(arr)
 ```
+
+---
 
 ## 20. Comments
 
-```
+```rust
 // single line comment
 
 /*
@@ -542,13 +586,15 @@ arr.pop()           // pop(arr)
 */
 ```
 
+---
+
 ## 21. Scope Rules
 
-- Block scoping: variables live within their `{ }` block.
-- No variable shadowing in the same scope.
-- Inner scopes can shadow outer variables.
+- Block scoping: variables live within their `{ }` block
+- No variable shadowing in the same scope
+- Inner scopes can shadow outer variables
 
-```
+```rust
 let x: int = 1;
 {
     let x: int = 2;  // OK: shadows outer x
@@ -557,15 +603,21 @@ let x: int = 1;
 print(x);            // prints 1
 ```
 
+---
+
 ## 22. Memory Model
 
 All heap-allocated values (strings, arrays, structs) use reference counting.
 
-- Assignment copies the reference, increments refcount.
-- When a variable goes out of scope, refcount decrements.
-- When refcount reaches 0, memory is freed.
-- **No cycle detection.** Programmer must avoid circular references.
-- Defer statements provide deterministic cleanup ordering.
+| Rule | Detail |
+|------|--------|
+| **Assignment** | Copies the reference, increments refcount |
+| **Scope exit** | Decrements refcount |
+| **Refcount = 0** | Memory is freed |
+| **Cycles** | No cycle detection — programmer must avoid circular references |
+| **Cleanup** | Defer statements provide deterministic cleanup ordering |
+
+---
 
 ## 23. Built-in Functions
 
@@ -592,17 +644,17 @@ All heap-allocated values (strings, arrays, structs) use reference counting.
 | Function | Description |
 |----------|-------------|
 | `str_len(s)` | String length |
-| `str_upper(s)` | Uppercase string |
-| `str_lower(s)` | Lowercase string |
+| `str_upper(s)` | Uppercase |
+| `str_lower(s)` | Lowercase |
 | `str_trim(s)` | Trim whitespace |
-| `str_contains(s, sub)` | Check if string contains substring |
+| `str_contains(s, sub)` | Check substring |
 | `str_find(s, sub)` | Find index of substring (-1 if not found) |
-| `str_slice(s, a, b)` | Substring from index a to b |
-| `str_replace(s, a, b)` | Replace occurrences of a with b |
-| `str_starts_with(s, p)` | Check if string starts with prefix |
-| `str_ends_with(s, p)` | Check if string ends with suffix |
-| `str_split(s, delim)` | Split string into array of strings |
-| `char_at(s, i)` | Get character at index (as string) |
+| `str_slice(s, a, b)` | Substring from index `a` to `b` |
+| `str_replace(s, a, b)` | Replace occurrences of `a` with `b` |
+| `str_starts_with(s, p)` | Check prefix |
+| `str_ends_with(s, p)` | Check suffix |
+| `str_split(s, delim)` | Split into array of strings |
+| `char_at(s, i)` | Character at index (as string) |
 
 ### Conversion
 
@@ -619,18 +671,16 @@ All heap-allocated values (strings, arrays, structs) use reference counting.
 | `abs(x)` | Absolute value (int) |
 | `fabs(x)` | Absolute value (float) |
 | `sqrt(x)` | Square root |
-| `pow(x, y)` | Power (x^y) |
-| `min(a, b)` | Minimum of two ints |
-| `max(a, b)` | Maximum of two ints |
-| `fmin(a, b)` | Minimum of two floats |
-| `fmax(a, b)` | Maximum of two floats |
+| `pow(x, y)` | Power |
+| `min(a, b)` / `max(a, b)` | Min/max (int) |
+| `fmin(a, b)` / `fmax(a, b)` | Min/max (float) |
 
 ### Result
 
 | Function | Description |
 |----------|-------------|
-| `is_ok(result)` | Check if Result is Ok |
-| `is_err(result)` | Check if Result is Err |
+| `is_ok(result)` | Check if Ok |
+| `is_err(result)` | Check if Err |
 | `unwrap(result)` | Extract Ok value (aborts on Err) |
 | `unwrap_err(result)` | Extract Err value (aborts on Ok) |
 
@@ -648,13 +698,15 @@ All heap-allocated values (strings, arrays, structs) use reference counting.
 | Function | Description |
 |----------|-------------|
 | `exit(code)` | Exit program with code |
-| `assert(cond, msg)` | Abort with message if condition false |
+| `assert(cond, msg)` | Abort with message if condition is false |
+
+---
 
 ## 24. Generics
 
-Functions can be parameterized with type parameters using angle brackets:
+Functions can be parameterized with type parameters:
 
-```
+```rust
 fn identity<T>(x: T): T {
     return x;
 }
@@ -669,7 +721,7 @@ fn max_val<T>(a: T, b: T): T {
 
 Type arguments are specified explicitly at the call site:
 
-```
+```rust
 let a: int = max_val<int>(10, 20);
 let b: float = max_val<float>(3.14, 2.71);
 let c: str = identity<str>("hello generics");
@@ -679,11 +731,13 @@ let c: str = identity<str>("hello generics");
 
 Generic functions are monomorphized at compile time — a specialized C function is generated for each unique type instantiation.
 
+---
+
 ## 25. Impl Blocks / Methods
 
 Methods can be defined on structs using `impl` blocks:
 
-```
+```rust
 struct Point {
     x: float;
     y: float;
@@ -698,20 +752,22 @@ impl Point {
 
 ### Method Calls
 
-```
+```rust
 let p: Point = Point { x: 3.0, y: 4.0 };
 let len: float = p.length();
 print(f"Length: {len}");
 ```
 
-- Methods use `self` as the first parameter (no explicit type annotation needed).
-- Methods are compiled as `TypeName_method_name(self, ...)` in the generated C code.
+- Methods use `self` as the first parameter (no explicit type annotation needed)
+- Compiled as `TypeName_method_name(self, ...)` in the generated C code
+
+---
 
 ## 26. Traits
 
 Traits define shared behavior as a set of method signatures:
 
-```
+```rust
 trait Display {
     fn to_string(self): str;
 }
@@ -719,7 +775,7 @@ trait Display {
 
 ### Implementing Traits
 
-```
+```rust
 impl Display for Point {
     fn to_string(self): str {
         return f"Point({self.x}, {self.y})";
@@ -727,15 +783,17 @@ impl Display for Point {
 }
 ```
 
-- Trait methods use `self` as the first parameter.
-- A type can implement multiple traits.
-- Trait implementations are checked for completeness (all methods must be defined).
+- Trait methods use `self` as the first parameter
+- A type can implement multiple traits
+- Trait implementations are checked for completeness — all methods must be defined
+
+---
 
 ## 27. Closures / Lambdas
 
 Anonymous functions using pipe `|` syntax:
 
-```
+```rust
 let twice: fn(int): int = |n: int|: int {
     return n * 2;
 };
@@ -745,7 +803,7 @@ let twice: fn(int): int = |n: int|: int {
 
 Closure and function types are written as `fn(param_types): return_type`:
 
-```
+```rust
 let add_one: fn(int): int = |x: int|: int {
     return x + 1;
 };
@@ -755,7 +813,7 @@ let add_one: fn(int): int = |x: int|: int {
 
 Functions can accept and return function values:
 
-```
+```rust
 fn apply(f: fn(int): int, x: int): int {
     return f(x);
 }
@@ -765,7 +823,7 @@ let result: int = apply(add_one, 10);  // 11
 
 Named functions can also be passed as values:
 
-```
+```rust
 fn double(x: int): int {
     return x * 2;
 }
@@ -773,11 +831,13 @@ fn double(x: int): int {
 let r: int = apply(double, 5);  // 10
 ```
 
+---
+
 ## 28. Async / Await
 
 Functions can be declared `async` to run concurrently:
 
-```
+```rust
 async fn compute(x: int): int {
     return x * x;
 }
@@ -791,7 +851,7 @@ async fn greet(name: str): str {
 
 Calling an async function returns a future. Use `await` to block and retrieve the result:
 
-```
+```rust
 fn main(): void {
     let fut1 = compute(7);
     let fut2 = compute(3);
@@ -803,9 +863,11 @@ fn main(): void {
 }
 ```
 
-- Async functions run on separate threads.
-- `await` blocks until the future completes and returns its value.
-- Platform-aware: uses Windows threads (`_beginthreadex`) or pthreads.
+- Async functions run on separate threads
+- `await` blocks until the future completes and returns its value
+- Platform-aware: uses Windows threads (`_beginthreadex`) or pthreads
+
+---
 
 ## 29. Package Manager
 
@@ -835,22 +897,24 @@ json = "0.2.0"
 
 ### Dependency Resolution
 
-- Dependencies named matching stdlib modules (e.g., `math`, `json`) resolve to the built-in standard library.
-- Git URLs are cloned into the `urus_modules/` directory.
-- A lock file (`urus.lock`) is generated after install.
+- Dependencies matching stdlib module names (e.g., `math`, `json`) resolve to the built-in standard library
+- Git URLs are cloned into the `urus_modules/` directory
+- A lock file (`urus.lock`) is generated after install
+
+---
 
 ## 30. Standard Library
 
 The standard library provides importable modules in `compiler/stdlib/`. Import with:
 
-```
+```rust
 import "math.urus";
 import "json.urus";
 ```
 
 ### `math.urus`
 
-Constants:
+**Constants:**
 
 | Constant | Value |
 |----------|-------|
@@ -858,7 +922,7 @@ Constants:
 | `MATH_E` | 2.71828182845904523536 |
 | `MATH_TAU` | 6.28318530717958647692 |
 
-Trigonometry:
+**Trigonometry:**
 
 | Function | Description |
 |----------|-------------|
@@ -870,7 +934,7 @@ Trigonometry:
 | `math_atan(x)` | Arc tangent |
 | `math_atan2(y, x)` | Two-argument arc tangent |
 
-Logarithms:
+**Logarithms:**
 
 | Function | Description |
 |----------|-------------|
@@ -878,7 +942,7 @@ Logarithms:
 | `math_log2(x)` | Base-2 logarithm |
 | `math_log10(x)` | Base-10 logarithm |
 
-Rounding:
+**Rounding:**
 
 | Function | Description |
 |----------|-------------|
@@ -886,7 +950,7 @@ Rounding:
 | `math_floor(x)` | Floor |
 | `math_round(x)` | Round to nearest |
 
-Utility:
+**Utility:**
 
 | Function | Description |
 |----------|-------------|
@@ -896,7 +960,7 @@ Utility:
 | `math_random_int(min, max)` | Random integer in range |
 | `math_random_float()` | Random float in [0, 1] |
 
-Number Theory:
+**Number Theory:**
 
 | Function | Description |
 |----------|-------------|
@@ -908,14 +972,14 @@ Number Theory:
 | `math_comb(n, k)` | Combination C(n, k) |
 | `math_perm(n, k)` | Permutation P(n, k) |
 
-Statistics:
+**Statistics:**
 
 | Function | Description |
 |----------|-------------|
 | `math_sum(values)` | Sum of float array |
 | `math_mean(values)` | Mean of float array |
 
-Numerical Calculus:
+**Numerical Calculus:**
 
 | Function | Description |
 |----------|-------------|
@@ -956,7 +1020,8 @@ declaration    = fn_decl | struct_decl | enum_decl | import_decl
                | trait_decl | impl_block
                | statement ;
 
-fn_decl        = [ "async" ] "fn" IDENT [ generic_params ] "(" param_list ")" [ ":" type ] block ;
+fn_decl        = [ "async" ] "fn" IDENT [ generic_params ] "(" param_list ")"
+                 [ ":" type ] block ;
 generic_params = "<" IDENT { "," IDENT } ">" ;
 param_list     = [ param { "," param } ] ;
 param          = [ "mut" ] IDENT ":" type [ "=" expr ] ;
@@ -1080,7 +1145,8 @@ INT_LIT        = DIGIT { DIGIT | "_" }
                | "0x" HEX_DIGIT { HEX_DIGIT | "_" }
                | "0o" OCT_DIGIT { OCT_DIGIT | "_" }
                | "0b" BIN_DIGIT { BIN_DIGIT | "_" } ;
-FLOAT_LIT      = DIGIT { DIGIT | "_" } "." { DIGIT | "_" } [ ("e"|"E") ["+"|"-"] DIGIT { DIGIT } ] ;
+FLOAT_LIT      = DIGIT { DIGIT | "_" } "." { DIGIT | "_" }
+                 [ ("e"|"E") ["+"|"-"] DIGIT { DIGIT } ] ;
 
 (* Tokens *)
 IDENT          = ALPHA { ALPHA | DIGIT | "_" } ;
@@ -1096,7 +1162,7 @@ BIN_DIGIT      = "0" | "1" ;
 
 ## Example Program
 
-```urus
+```rust
 struct Circle {
     radius: float;
 }
