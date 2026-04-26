@@ -1,5 +1,5 @@
-fn test(): void {
-    print("hello from test");
+fn unused(): void {
+    print("hello from unused");
 }
 
 fn main(): void {

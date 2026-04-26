@@ -24,5 +24,10 @@ jobs:
     - name: Build Urus Compiler
       run: cmake --build compiler/build --parallel $(nproc)
 
+    - name: Install stdlib
+      run: |
+        sudo mkdir -p /usr/lib/urusc
+        sudo cp compiler/stdlib/*.urus /usr/lib/urusc/
+
     - name: Run CTest
       run: ctest --test-dir compiler/build --output-on-failure --parallel $(nproc)
