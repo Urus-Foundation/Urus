@@ -1,0 +1,22 @@
+// Regression test for F-MEM-7 + F-MEM-8.
+//
+// Exercises:
+//   - the *_fmt_n length-aware code path (codegen emits an explicit count)
+//   - the URUS_FMT_ANY char* dispatch going through urus__fmt_from_cstr
+//     instead of the removed URUS_FMT_PTR_TAG
+//
+// Expected output:
+//   x=1 y=2 z=3
+//   name=Aurochs
+module main
+use urus.io.println
+
+fn main() {
+    let x = 1
+    let y = 2
+    let z = 3
+    println(f"x={x} y={y} z={z}")
+
+    let name = "Aurochs"
+    println(f"name={name}")
+}

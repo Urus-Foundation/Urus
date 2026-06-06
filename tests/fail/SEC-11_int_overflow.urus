@@ -1,0 +1,11 @@
+// SEC-11 — Tier-1 hardening: integer literal must not overflow u64.
+//
+// Pre-b016 `strtoull` saturated at ULLONG_MAX without surfacing errno,
+// so a source like `999999999999999999999u64` lexed as `2^64 - 1` and the
+// program ran with a silently corrupted constant. From b016 the lexer
+// emits a precise overflow diagnostic.
+
+fn main() -> () {
+    let n = 999999999999999999999;
+    println(f"{n}");
+}

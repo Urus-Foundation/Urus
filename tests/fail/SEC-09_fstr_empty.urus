@@ -1,0 +1,11 @@
+// SEC-09 — F-MEM-1 regression: empty placeholder.
+//
+// `{}` with no identifier inside is meaningless and previously slipped
+// through to emit `URUS_FMT_ANY()` (a syntax error in the *output* C —
+// which means urusc returned 0 while producing a broken artifact).
+// Now diagnosed at codegen time with a precise URUS-level message.
+
+fn main() -> () {
+    let s = f"empty {}";
+    println(s);
+}

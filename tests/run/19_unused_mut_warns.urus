@@ -1,0 +1,19 @@
+// b021 smoke: unused `mut` produces a WARNING, not an error — this file
+// must still compile successfully (exit 0) while printing the diagnostic
+//   binding 'y' is declared `mut` but never mutated — consider dropping `mut`
+//
+// `x` is mutated so it must stay silent; `z` is `&mut`-borrowed which also
+// counts as exercised.
+
+fn bump(p: &mut i32) -> () {
+    *p += 1;
+}
+
+fn main() -> () {
+    let mut x = 1;
+    x = 2;                 // exercised — no warning
+    let mut y = 3;         // never mutated — warns
+    let mut z = 4;
+    bump(&mut z);          // &mut borrow — counts as exercised
+    println(f"{x} {y} {z}");
+}

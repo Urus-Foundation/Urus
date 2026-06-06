@@ -1,0 +1,12 @@
+// SEC-10 — F-MEM-1 regression: malformed dot chain.
+//
+// `{.foo}`, `{foo.}`, and `{foo..bar}` are all rejected — the validator
+// requires a `.`-separated sequence of identifiers with no leading,
+// trailing, or consecutive dots. This catches accidental shape errors
+// AND blocks accidental-looking injection attempts like `{.f(); a}`.
+
+fn main() -> () {
+    let n = 1;
+    let s = f"bad {.n}";
+    println(s);
+}

@@ -1,0 +1,17 @@
+// Verifies that the StrBuf growth path can produce a non-trivial
+// translation unit without tripping the b011 size guard.
+//
+// The body interpolates ~40 small expressions, exercising the same
+// urus_fmt_arg array building path that the StrBuf grows for.
+module main
+use urus.io.println
+
+fn main() {
+    let a = 1
+    let b = 2
+    let c = 3
+    println("a={a} b={b} c={c}")
+    println("a={a} b={b} c={c}")
+    println("a={a} b={b} c={c}")
+    println("a={a} b={b} c={c}")
+}

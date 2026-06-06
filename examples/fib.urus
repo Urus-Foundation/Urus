@@ -1,0 +1,17 @@
+// Fibonacci — control flow + recursion
+module main
+
+use urus.io.println
+
+fn fib(n: u64) -> u64 {
+    if n < 2 {
+        return n
+    }
+    return fib(n - 1) + fib(n - 2)
+}
+
+fn main() {
+    let n: u64 = 20
+    let result: u64 = fib(n)
+    println("fib({n}) = {result}")
+}

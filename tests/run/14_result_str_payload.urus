@@ -1,0 +1,21 @@
+// Regression for F-TY-2: a Result<str, str> must round-trip the str payload
+// without truncation. Pre-b015 the str (ptr+len = 16B) was crammed into an
+// int64 payload — only the pointer survived, and the length got zeroed.
+// Post-b015 the payload union has a proper urus_str arm.
+
+fn pick(use_ok: bool) -> Result<str, str> {
+    if use_ok { Ok("hello") } else { Err("nope") }
+}
+
+fn main() -> () {
+    let r = pick(true);
+    match r {
+        Ok(s)  => println(f"ok={s}"),     // expect: ok=hello
+        Err(e) => println(f"err={e}"),
+    }
+    let r2 = pick(false);
+    match r2 {
+        Ok(s)  => println(f"ok={s}"),
+        Err(e) => println(f"err={e}"),    // expect: err=nope
+    }
+}

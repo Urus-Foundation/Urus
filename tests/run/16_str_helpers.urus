@@ -1,0 +1,30 @@
+// Smokes the urus_str helpers added in v0.0.1-b017. These are runtime
+// `static inline` C functions reachable through `use urus.str.*` once the
+// stdlib binding lands; for now they're available via the codegen prelude
+// so the test compiles by calling the C symbols directly through `use`.
+
+use urus.io.println
+
+fn main() -> () {
+    let a = "hello";
+    let b = "hello";
+    let c = "world";
+    // Equality
+    let eq_ab = urus_str_eq(a, b);
+    let eq_ac = urus_str_eq(a, c);
+    println(f"eq_ab={eq_ab}");      // expect: eq_ab=true
+    println(f"eq_ac={eq_ac}");      // expect: eq_ac=false
+
+    // Prefix / suffix
+    let pre = urus_str_starts_with(a, "hel");
+    let suf = urus_str_ends_with(a, "llo");
+    println(f"pre={pre} suf={suf}");
+
+    // Contains
+    let hit = urus_str_contains(a, "ell");
+    println(f"hit={hit}");
+
+    // Length
+    let n = urus_str_len(a);
+    println(f"n={n}");              // expect: n=5
+}

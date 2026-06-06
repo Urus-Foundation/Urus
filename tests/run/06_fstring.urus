@@ -1,0 +1,15 @@
+// f-string literals usable anywhere a string is wanted
+module main
+use urus.io.println
+
+fn greet(name: str) -> str {
+    return f"hello, {name}!"
+}
+
+fn main() {
+    let s = greet("Aurochs")
+    println(s)
+    // F-MEM-1: placeholders are IDENT (DOT IDENT)* only — bind first.
+    let four = 4
+    println(f"plain f-string also works: 2 + 2 = {four}")
+}

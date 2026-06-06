@@ -1,0 +1,16 @@
+// SEC-07 — F-COMP-3 regression (Option)
+//
+// Same finding as SEC-06, applied to Option. Missing `None` arm must be
+// diagnosed; adding `_` would silence it (escape hatch by design).
+
+fn unwrap_or_zero(o: Option<i32>) -> i32 {
+    match o {
+        Some(v) => v,
+        // None arm missing — must be diagnosed
+    }
+}
+
+fn main() -> () {
+    let x = unwrap_or_zero(Some(42));
+    println(f"{x}");
+}

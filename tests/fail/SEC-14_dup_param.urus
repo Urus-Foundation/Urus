@@ -1,0 +1,16 @@
+// SEC-14 — b021 regression: duplicate parameter names must be rejected.
+//
+// Pre-b021 both `x` params landed in the same scope slot (scope_define
+// returns the existing symbol on name match), so the second silently
+// shadowed the first and the emitted C had two parameters named `x` —
+// a hard error only at the *host* compiler layer, with a C-level message
+// that points nowhere near the URUS source.
+
+fn add(x: i32, x: i32) -> i32 {
+    x + x
+}
+
+fn main() -> () {
+    let v = add(1, 2);
+    println(f"{v}");
+}

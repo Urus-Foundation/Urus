@@ -1,0 +1,10 @@
+// SEC-12 — Tier-1 hardening: hex literal overflow is also rejected.
+//
+// `0x1_0000_0000_0000_0000` is exactly 2^64, one bit past u64. The
+// overflow path is shared with decimal so this also proves the
+// underscore-stripping and base-16 parse path cooperate with errno.
+
+fn main() -> () {
+    let n = 0x1_0000_0000_0000_0000;
+    println(f"{n}");
+}

@@ -1,0 +1,16 @@
+// harness: skip
+// SECURITY: file-size cap regression smoke test (Tier-0 item #11).
+// (The harness self-test covers the cap via `--max-input-bytes 16` since b020.)
+//
+// We can't easily ship a 65 MiB test artifact in the repo, so this file
+// is just a documentation marker.  The actual cap is enforced in
+// compiler/src/main.c::read_file via URUS_MAX_INPUT_BYTES.  To test
+// manually:
+//
+//   yes | head -c 70000000 > /tmp/huge.urus
+//   urusc /tmp/huge.urus
+//   # expected: "urusc: '/tmp/huge.urus' is 70000000 bytes; the limit is 67108864 bytes"
+//
+// expect: module
+module main
+fn main() {}

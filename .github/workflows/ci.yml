@@ -1,0 +1,123 @@
+# URUS CI — build matrix + sanitizers + test harness
+#
+# Jobs:
+#   build-test    — gcc + clang on Linux, clang on macOS, MSVC-cmake on
+#                   Windows (compiler builds with MSVC; only *emitted C*
+#                   requires GCC/Clang).  Runs scripts/run-tests.{sh,ps1}.
+#   sanitize      — Linux clang with ASan+UBSan, full test sweep under the
+#                   sanitized binary.  Any report fails the job.
+#
+# Added in v0.0.1-b022 (Tier-1 audit items: "ASan+UBSan in CI").
+
+name: ci
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  build-test:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: ubuntu-latest
+            cc: gcc
+          - os: ubuntu-latest
+            cc: clang
+          - os: macos-latest
+            cc: clang
+          - os: windows-latest
+            cc: msvc
+    runs-on: ${{ matrix.os }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure
+        shell: bash
+        run: |
+          if [ "${{ matrix.cc }}" = "msvc" ]; then
+            cmake -B compiler/build -S .
+          else
+            cmake -B compiler/build -S . -DCMAKE_C_COMPILER=${{ matrix.cc }}
+          fi
+
+      - name: Build
+        run: cmake --build compiler/build
+
+      - name: Test (POSIX)
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          BIN=$(find compiler/build -name urusc -type f | head -n 1)
+          ./scripts/run-tests.sh "$BIN"
+
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $bin = Get-ChildItem -Recurse compiler/build -Filter urusc.exe | Select-Object -First 1
+          ./scripts/run-tests.ps1 -Binary $bin.FullName
+
+  fuzz:
+    # 5-minute libFuzzer sweep per PR (Tier-1 audit item #17).
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure fuzzer
+        run: >
+          cmake -B build-fuzz -S .
+          -DCMAKE_C_COMPILER=clang
+          -DURUS_BUILD_FUZZER=ON
+
+      - name: Build fuzzer
+        run: cmake --build build-fuzz
+
+      - name: Seed corpus
+        run: ./scripts/make-corpus.sh fuzz/corpus
+
+      - name: Fuzz 5 minutes
+        run: |
+          FUZZBIN=$(find build-fuzz -name fuzz_compile -type f | head -n 1)
+          "$FUZZBIN" fuzz/corpus -max_total_time=300 -timeout=10 -rss_limit_mb=2048
+
+      - name: Upload crashes (if any)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashes
+          path: crash-*
+          if-no-files-found: ignore
+
+  sanitize:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Configure with ASan + UBSan
+        run: >
+          cmake -B compiler/build -S .
+          -DCMAKE_C_COMPILER=clang
+          -DCMAKE_BUILD_TYPE=Debug
+          -DCMAKE_C_FLAGS="-fsanitize=address,undefined -fno-omit-frame-pointer -fno-sanitize-recover=all"
+          -DCMAKE_EXE_LINKER_FLAGS="-fsanitize=address,undefined"
+
+      - name: Build
+        run: cmake --build compiler/build
+
+      - name: Test under sanitizers
+        env:
+          # detect_leaks=0: urusc intentionally exits without freeing its
+          # arena-backed structures (classic short-lived-process pattern);
+          # leak checking would drown real signals.  ASan still catches
+          # use-after-free, OOB, and double-free.
+          ASAN_OPTIONS: detect_leaks=0:strict_string_checks=1
+          UBSAN_OPTIONS: print_stacktrace=1
+        run: |
+          BIN=$(find compiler/build -name urusc -type f | head -n 1)
+          ./scripts/run-tests.sh "$BIN"

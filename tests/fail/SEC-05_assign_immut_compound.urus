@@ -1,0 +1,11 @@
+// SEC-05 — F-COMP-2 regression (compound assignment)
+//
+// Compound assignment (`+=`, `-=`, ...) must also respect mutability.
+// Without this check, sema would let attackers smuggle in mutation via
+// the compound form even after F-COMP-2 caught the plain `=` case.
+
+fn main() -> () {
+    let n = 10;
+    n += 5;           // immutable — must be diagnosed as "modify"
+    println(f"{n}");
+}

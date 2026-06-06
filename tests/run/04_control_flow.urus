@@ -1,0 +1,12 @@
+module main
+use urus.io.println
+
+fn main() {
+    let mut n: i64 = 0
+    let mut i: i64 = 1
+    while i <= 10 {
+        n = n + i
+        i = i + 1
+    }
+    println("sum 1..10 = {n}")
+}

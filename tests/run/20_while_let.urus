@@ -1,0 +1,15 @@
+// b024 smoke: `while let Some(x) = …` desugars to loop+match and compiles.
+// take() yields Some twice then None, so the loop body runs twice.
+
+fn take(n: i32) -> Option<i32> {
+    if n < 2 { Some(n) } else { None }
+}
+
+fn main() -> () {
+    let mut i = 0;
+    while let Some(v) = take(i) {
+        println(f"v={v}");
+        i += 1;
+    }
+    println(f"done i={i}");    // expect: done i=2
+}

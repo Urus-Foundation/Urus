@@ -1,0 +1,11 @@
+// SEC-08 — F-MEM-1 regression: function-call inside f-string placeholder.
+//
+// Calls were one of the original RCE vectors — `f"{system(\"…\")}"` would
+// have linked the host C `system()` against the emitted binary. After b014
+// the validator rejects parentheses (and anything else that isn't an
+// identifier chain) as "invalid character '(' in f-string placeholder".
+
+fn main() -> () {
+    let s = f"oops {evil()}";
+    println(s);
+}

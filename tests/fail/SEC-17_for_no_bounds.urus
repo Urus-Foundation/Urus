@@ -1,0 +1,11 @@
+// SEC-17 — b024 regression: half-open range in `for` must be a diagnostic.
+//
+// Pre-b024 a `for x in 0..` emitted C containing a NULL-deref crash inside
+// the compiler (range.end == NULL fed to cg_expr) or, in the comment-emit
+// variant, produced silently broken C. Now it's a clean URUS-level error.
+
+fn main() -> () {
+    for i in 0.. {
+        println(f"{i}");
+    }
+}

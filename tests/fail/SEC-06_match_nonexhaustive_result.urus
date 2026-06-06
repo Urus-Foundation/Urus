@@ -1,0 +1,18 @@
+// SEC-06 — F-COMP-3 regression
+//
+// Audit finding: `match` exhaustiveness was not checked, so a Result/Option
+// match missing one arm fell through to a default `(void)0` and produced an
+// uninitialised read of the result expression. From v0.0.1-b013 sema rejects
+// any match on Result that omits Ok or Err (and offers `_` as escape hatch).
+
+fn classify(r: Result<i32, i32>) -> i32 {
+    match r {
+        Ok(v)  => v,
+        // Err arm missing — must be diagnosed
+    }
+}
+
+fn main() -> () {
+    let x = classify(Ok(7));
+    println(f"{x}");
+}

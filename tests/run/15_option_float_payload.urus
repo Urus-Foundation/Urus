@@ -1,0 +1,16 @@
+// Regression for F-TY-2: Option<f64> must preserve the bit pattern of the
+// double instead of routing it through int64 (which silently bit-puns and
+// destroys NaN payload + denormals). Pre-b015 every float was stored via
+// `(int64_t)(intptr_t)(v)`. Post-b015 the _Generic dispatch picks `.f`.
+
+fn maybe(n: f64) -> Option<f64> {
+    Some(n)
+}
+
+fn main() -> () {
+    let o = maybe(3.14);
+    match o {
+        Some(v) => println(f"v={v}"),     // expect roughly: v=3.14
+        None    => println(f"none"),
+    }
+}

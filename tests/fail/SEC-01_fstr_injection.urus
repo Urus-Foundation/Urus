@@ -1,0 +1,21 @@
+// SECURITY: F-MEM-1 proof-of-concept.
+//
+// This file MUST fail to compile in URUS v0.0.2+ — the f-string interpolation
+// placeholder accepts arbitrary text in v0.0.1 and pastes it verbatim into
+// emitted C, which is a critical RCE vulnerability when compiling untrusted
+// `.urus` sources.
+//
+// The fix is to re-lex the bracket contents and accept only
+//     IDENT (DOT IDENT)*
+// rejecting anything else with a hard error.
+//
+// In v0.0.1 (today) this file is "accepted" and produces malicious C — keep
+// it in tests/fail/ so the regression test fails until the fix lands.
+
+module main
+use urus.io.println
+
+fn main() {
+    let payload = f"x = {system(\"echo PWNED\")}"
+    println(payload)
+}

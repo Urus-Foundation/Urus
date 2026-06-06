@@ -1,0 +1,20 @@
+// ? operator on Result
+module main
+use urus.io.println
+
+fn parse_int(s: str) -> Result<i64, str> {
+    return Ok(42)
+}
+
+fn parse_pair(a: str, b: str) -> Result<i64, str> {
+    let x = parse_int(a)?
+    let y = parse_int(b)?
+    return Ok(x + y)
+}
+
+fn main() {
+    match parse_pair("1", "2") {
+        Ok(v)  => println("sum = {v}"),
+        Err(e) => println("err: {e}"),
+    }
+}

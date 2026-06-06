@@ -1,0 +1,51 @@
+// grades.urus — enums + exhaustive match + for-range + Result, the whole
+// v0.0.1-b013..b024 sema surface in one file.
+//
+//   urusc examples/grades.urus --emit-c
+//   gcc examples/grades.urus.c -I stdlib/runtime -o grades && ./grades
+
+module main
+
+use urus.io.println
+
+enum Grade {
+    Pass,
+    Borderline,
+    Fail,
+}
+
+fn classify(score: i64) -> Result<i64, str> {
+    if score < 0 {
+        Err("negative score")
+    } else {
+        Ok(score)
+    }
+}
+
+fn grade_of(score: i64) -> Grade {
+    if score >= 70 {
+        Grade::Pass
+    } else if score >= 50 {
+        Grade::Borderline
+    } else {
+        Grade::Fail
+    }
+}
+
+fn main() -> () {
+    let mut passed = 0;
+    for s in 0..=100 {
+        match classify(s) {
+            Ok(v)  => {
+                // match on a user enum must cover ALL variants (F-COMP-3)
+                match grade_of(v) {
+                    Pass       => { passed += 1; }
+                    Borderline => {}
+                    Fail       => {}
+                }
+            }
+            Err(e) => println(f"error: {e}"),
+        }
+    }
+    println(f"passed={passed}");   // expect: passed=31 (70..=100)
+}
