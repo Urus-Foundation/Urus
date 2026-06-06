@@ -1,0 +1,15 @@
+// Smoke test for F-MEM-1: well-formed placeholders — bare ident, `obj.field`,
+// `a.b.c` — must compile cleanly through the new validator. Pairs with
+// tests/fail/SEC-01 (injection) and SEC-08 (each bad form).
+
+struct Point { x: i32, y: i32 }
+struct Bag   { p: Point }
+
+fn main() -> () {
+    let n = 42;
+    let p = Point { x: 1, y: 2 };
+    let b = Bag   { p: p };
+    println(f"n={n}");             // bare
+    println(f"x={p.x} y={p.y}");   // obj.field
+    println(f"deep={b.p.x}");      // a.b.c
+}

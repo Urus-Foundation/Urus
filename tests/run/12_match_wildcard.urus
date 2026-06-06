@@ -1,0 +1,15 @@
+// Smoke test for F-COMP-3: a wildcard arm satisfies exhaustiveness, so this
+// must compile cleanly even though `Err` is not enumerated explicitly.
+
+fn classify(r: Result<i32, i32>) -> i32 {
+    match r {
+        Ok(v) => v,
+        _     => -1,
+    }
+}
+
+fn main() -> () {
+    let a = classify(Ok(7));
+    let b = classify(Err(0));
+    println(f"a={a} b={b}");   // a=7 b=-1
+}

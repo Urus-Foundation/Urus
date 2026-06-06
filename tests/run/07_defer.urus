@@ -1,0 +1,10 @@
+// defer runs at end of enclosing block, LIFO
+module main
+use urus.io.println
+
+fn main() {
+    defer println("third (defer 1, ran last)")
+    defer println("second (defer 2)")
+    println("first (live code)")
+    defer println("zero (defer 3, ran first)")
+}

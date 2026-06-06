@@ -1,0 +1,13 @@
+// SEC-15 — b021 regression: `self` outside an impl block must be rejected.
+//
+// Pre-b021 a free function taking `self` sailed through sema and emitted
+// C with an unbound `self` identifier — failing only at the host-compiler
+// layer with a confusing message.
+
+fn loose(self) -> i32 {
+    0
+}
+
+fn main() -> () {
+    println(f"x");
+}

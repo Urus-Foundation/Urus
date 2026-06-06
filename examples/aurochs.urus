@@ -1,0 +1,25 @@
+// Struct + impl example
+module main
+
+use urus.io.println
+
+struct Aurochs {
+    name: str,
+    weight: f64,
+    power: u32,
+}
+
+impl Aurochs {
+    fn new(name: str, weight: f64) -> Aurochs {
+        return Aurochs { name: name, weight: weight, power: 100 }
+    }
+
+    fn rampage(&self) {
+        println("{self.name} rampages with power {self.power}!")
+    }
+}
+
+fn main() {
+    let bos = Aurochs.new("Bos", 1200.0)
+    bos.rampage()
+}

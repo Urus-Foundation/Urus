@@ -1,0 +1,20 @@
+// Smokes urus.io.read_line (v0.0.1-b019). Feed it a line on stdin:
+//
+//   echo hello | ./18_read_line
+//
+// Expected output:
+//   got=hello
+//   done
+//
+// On immediate EOF (empty stdin) the match takes the None arm.
+
+use urus.io.println
+use urus.io.read_line
+
+fn main() -> () {
+    match read_line() {
+        Some(line) => println(f"got={line}"),
+        None       => println(f"eof"),
+    }
+    println(f"done");
+}

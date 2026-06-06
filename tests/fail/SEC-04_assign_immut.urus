@@ -1,0 +1,13 @@
+// SEC-04 — F-COMP-2 regression
+//
+// Audit finding: `let mut` was paint-only — sema did not refuse writes to
+// immutably-bound names. From v0.0.1-b013 onward, sema must reject this
+// program with a "cannot assign to immutable binding 'x'" diagnostic.
+//
+// Expected: compile error from `urusc`, NOT a successful --emit-c run.
+
+fn main() -> () {
+    let x = 1;
+    x = 2;            // immutable — must be diagnosed
+    println(f"{x}");
+}

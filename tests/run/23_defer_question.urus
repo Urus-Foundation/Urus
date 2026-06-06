@@ -1,0 +1,25 @@
+// b028 smoke: defer fires on the `?` early-return path too.
+//
+// fail(true) propagates Err through `?` — the defer must still run
+// BEFORE the propagating return, and after _t is materialised.
+
+fn fail(b: bool) -> Result<i32, str> {
+    if b { Err("boom") } else { Ok(7) }
+}
+
+fn run(b: bool) -> Result<i32, str> {
+    defer println(f"cleanup");
+    let v = fail(b)?;
+    Ok(v + 1)
+}
+
+fn main() -> () {
+    match run(true) {
+        Ok(v)  => println(f"ok={v}"),
+        Err(e) => println(f"err={e}"),    // expect: cleanup THEN err=boom
+    }
+    match run(false) {
+        Ok(v)  => println(f"ok={v}"),     // expect: cleanup THEN ok=8
+        Err(e) => println(f"err={e}"),
+    }
+}

@@ -1,0 +1,6 @@
+module main
+use urus.io.println
+
+fn main() {
+    println("hello")
+}

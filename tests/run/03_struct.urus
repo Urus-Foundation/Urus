@@ -1,0 +1,12 @@
+module main
+use urus.io.println
+
+struct Point {
+    x: i64,
+    y: i64,
+}
+
+fn main() {
+    let p = Point { x: 3, y: 4 }
+    println("p = ({p.x}, {p.y})")
+}

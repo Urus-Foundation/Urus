@@ -1,0 +1,24 @@
+// b028 smoke: defer fires on BOTH exits — early return and block end.
+//
+// Expected output:
+//   early
+//   cleanup
+//   normal
+//   cleanup
+//   done
+
+fn work(early: bool) -> i32 {
+    defer println(f"cleanup");
+    if early {
+        println(f"early");
+        return 1;
+    }
+    println(f"normal");
+    0
+}
+
+fn main() -> () {
+    let a = work(true);
+    let b = work(false);
+    println(f"done");
+}

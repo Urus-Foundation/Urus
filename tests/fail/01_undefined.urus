@@ -1,0 +1,5 @@
+// Should fail: undefined variable
+module main
+fn main() {
+    let y = x + 1
+}

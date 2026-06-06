@@ -1,0 +1,15 @@
+// SEC-16 — b021 regression: `&mut x` over an immutable binding rejected.
+//
+// The F-COMP-2 fix (b013) gated direct assignment; b021 extends the same
+// classify_lhs gate to mutable borrows, closing the loophole where code
+// could take `&mut` of an immutable binding and write through the pointer.
+
+fn bump(p: &mut i32) -> () {
+    *p += 1;
+}
+
+fn main() -> () {
+    let x = 1;
+    bump(&mut x);      // must error: x is not `mut`
+    println(f"{x}");
+}

@@ -1,0 +1,12 @@
+// Smoke test for the F-COMP-2 fix: with `let mut`, assignment must succeed.
+//
+// Pairs with tests/fail/SEC-04 (without `mut`) — together they prove the
+// check is precise rather than overzealous. Expect: compiles via `--emit-c`,
+// no diagnostics.
+
+fn main() -> () {
+    let mut x = 0;
+    x = 1;
+    x += 41;
+    println(f"x={x}");      // x=42
+}

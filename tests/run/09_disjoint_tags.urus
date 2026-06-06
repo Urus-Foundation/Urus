@@ -1,0 +1,37 @@
+// Regression test for F-TY-1.  Pre-b012 the Result and Option tag
+// namespaces overlapped: URUS_RES_OK == URUS_OPT_NONE == 0 and
+// URUS_RES_ERR == URUS_OPT_SOME == 1.  An accidental cross-cast
+// (treating an Option as a Result, or vice versa) would silently
+// pass `urus_is_ok` / `urus_is_none` checks.
+//
+// In b012 the tag values are disjoint (Result 0/1, Option 2/3), so
+// the program below should print exactly two lines:
+//
+//   ok=42
+//   some=7
+//
+// without any tag confusion.
+
+module main
+use urus.io.println
+
+fn try_div(a: i64, b: i64) -> Result<i64, str> {
+    if b == 0 { return Err("zero") }
+    return Ok(a / b)
+}
+
+fn maybe(x: i64) -> Option<i64> {
+    if x < 0 { return None }
+    return Some(x)
+}
+
+fn main() {
+    match try_div(42, 1) {
+        Ok(v)  => println(f"ok={v}"),
+        Err(e) => println(f"err={e}"),
+    }
+    match maybe(7) {
+        Some(v) => println(f"some={v}"),
+        None    => println("none"),
+    }
+}

@@ -1,0 +1,19 @@
+// Smoke for the b018 sema check: when the surrounding fn does return
+// Result, `?` is accepted and the propagation lowers cleanly through
+// the existing GCC statement-expression path.
+
+fn parse(s: str) -> Result<i32, str> {
+    Ok(42)
+}
+
+fn run() -> Result<i32, str> {
+    let v = parse("x")?;
+    Ok(v + 1)
+}
+
+fn main() -> () {
+    match run() {
+        Ok(v)  => println(f"v={v}"),     // expect: v=43
+        Err(e) => println(f"err={e}"),
+    }
+}

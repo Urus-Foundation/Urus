@@ -1,0 +1,19 @@
+// Result<T, E> error handling
+module main
+
+use urus.io.println
+
+fn divide(a: i64, b: i64) -> Result<i64, str> {
+    if b == 0 {
+        return Err("division by zero")
+    }
+    return Ok(a / b)
+}
+
+fn main() {
+    let r = divide(42, 6)
+    match r {
+        Ok(v)  => println("ok: {v}"),
+        Err(e) => println("err: {e}"),
+    }
+}

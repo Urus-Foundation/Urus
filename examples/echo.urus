@@ -1,0 +1,25 @@
+// echo.urus — interactive echo loop showcasing the v0.0.1-b019+ stdlib:
+// read_line, while let, str helpers, f-strings.
+//
+//   urusc examples/echo.urus --emit-c
+//   gcc examples/echo.urus.c -I stdlib/runtime -o echo
+//   ./echo
+//
+// Type lines; `quit` (or EOF / Ctrl-D) ends the loop.
+
+module main
+
+use urus.io.println
+use urus.io.read_line
+
+fn main() -> () {
+    let mut count = 0;
+    while let Some(line) = read_line() {
+        if urus_str_eq(line, "quit") {
+            break
+        }
+        count += 1;
+        println(f"{count}: {line}");
+    }
+    println(f"bye — {count} lines echoed");
+}

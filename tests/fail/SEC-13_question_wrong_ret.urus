@@ -1,0 +1,13 @@
+// SEC-13 — `?` operator must be rejected when surrounding fn does not
+// return Result or Option. Pre-b018 the codegen happily emitted an early
+// `return` of the inner's payload, which (a) returned a value of the wrong
+// type, and (b) on `fn -> ()` silently truncated the result.
+
+fn parse(_s: str) -> Result<i32, str> {
+    Ok(42)
+}
+
+fn main() -> () {
+    let v = parse("x")?;       // must error: main returns (), not Result/Option
+    println(f"v={v}");
+}
