@@ -42,4 +42,8 @@ if(URUS_BUILD_FUZZER)
     target_link_options(fuzz_compile PRIVATE -fsanitize=fuzzer,address,undefined)
     # The core library must also be sanitized for instrumentation coverage.
     target_compile_options(urus_core PRIVATE -fsanitize=fuzzer-no-link,address,undefined)
+    # urusc links the same (now-instrumented) core, so it needs the
+    # sanitizer runtimes too or its link fails with undefined __asan_* /
+    # __sancov_* references.
+    target_link_options(urusc PRIVATE -fsanitize=address,undefined)
 endif()
