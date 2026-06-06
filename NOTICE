@@ -1,0 +1,67 @@
+URUS
+Copyright 2026 Rasya Andrean and the URUS project contributors.
+
+This product is dual-licensed under the Apache License, Version 2.0
+("Apache-2.0") OR the MIT License ("MIT"), at the recipient's option.
+See LICENSE for the full Apache-2.0 text and the equivalent MIT text
+appended at the end of that file.
+
+────────────────────────────────────────────────────────────────────────
+Trademarks
+────────────────────────────────────────────────────────────────────────
+
+"URUS", "urusc", "tanduk", the aurochs mark, and the URUS wordmark /
+logotype are trademarks of Rasya Andrean (the project founder).
+
+The open-source license of the code (Apache-2.0 OR MIT) grants no
+rights in these trademarks. See GOVERNANCE.md § 5 and
+docs/documentation/15-VERSIONING.md for usage rules. Commercial use of
+the marks requires prior written permission from the founder.
+
+Permission requests: urusfoundation@gmail.com (placeholder) or
+rasyaandrean@outlook.co.id.
+
+────────────────────────────────────────────────────────────────────────
+Third-party notices
+────────────────────────────────────────────────────────────────────────
+
+URUS v0.0.1 has no bundled third-party source code or pre-built
+binaries. The compiler is original work; the runtime header is
+original work; the test corpus is original work.
+
+When third-party code is added in a future release, a corresponding
+notice will be appended below, including:
+
+  • Component name
+  • Upstream URL
+  • License
+  • A summary of any modifications made
+
+────────────────────────────────────────────────────────────────────────
+Contributor attribution
+────────────────────────────────────────────────────────────────────────
+
+Each contributor retains copyright in their own contributions. The
+inbound = outbound DCO (described in CONTRIBUTING.md) licenses every
+contribution under Apache-2.0 OR MIT and grants the project the right
+to redistribute the aggregate work.
+
+This NOTICE file is required to be redistributed together with the
+LICENSE file in any distribution of URUS, derivative work, or
+commercial product that embeds URUS-licensed material.
+
+────────────────────────────────────────────────────────────────────────
+Commercial licensing
+────────────────────────────────────────────────────────────────────────
+
+Commercial uses that go beyond the open-source license — branded
+distribution, trademark use, OEM bundling, hosted-service offerings,
+regulated-sector procurement — are subject to a separate commercial
+agreement. See COMMERCIAL.md and GOVERNANCE.md § 6.
+
+Contact: urusfoundation@gmail.com (placeholder) or
+rasyaandrean@outlook.co.id.
+
+────────────────────────────────────────────────────────────────────────
+
+Last updated: 2026-06-03 (v0.0.1-b008).
