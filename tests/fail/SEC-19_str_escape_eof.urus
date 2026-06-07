@@ -1,0 +1,4 @@
+// SEC-19 — companion to SEC-18: backslash escape at EOF inside a
+// string literal. Must diagnose, never read past the terminator.
+fn main() {
+    let s = "abc\
