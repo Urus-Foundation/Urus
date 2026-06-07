@@ -89,6 +89,12 @@ char *arena_strdup(Arena *a, const char *s) {
     return c;
 }
 
+void *arena_grow(Arena *a, void *old, size_t used_size, size_t new_size) {
+    void *p = arena_alloc(a, new_size);
+    if (old && used_size) memcpy(p, old, used_size);
+    return p;
+}
+
 char *arena_strndup(Arena *a, const char *s, size_t n) {
     char *c = (char *)arena_alloc(a, n + 1);
     memcpy(c, s, n);

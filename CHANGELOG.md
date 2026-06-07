@@ -344,6 +344,37 @@ diagnostics anti-amplification ✅ (b025), embedder-safe pipeline ✅
 (b026+b029), defer-on-all-exits ✅ (b028).  Remaining notable:
 F-TY-2 full monomorphisation (v0.0.2 headline).
 
+### Security (b031) — first fuzzer findings
+
+The v0.0.1 merge was the first time the b022/b023 CI actually executed.
+Once the environment issues were cleared (exec bits on the POSIX
+runners, an explicit `exit 0` in `run-tests.ps1`, sanitizer link flags
+for `urusc` under `URUS_BUILD_FUZZER=ON`), the first genuine fuzz runs
+caught two real bugs within minutes — exactly what the harness is for:
+
+- Lexer EOF overflow — a lone `'` (or a trailing `\` in a string
+  literal) at end of input advanced past the NUL terminator and read
+  out of bounds (ASan heap-buffer-overflow in `peek0`).  EOF guards
+  added in `lex_char` and `lex_string`; regressions
+  `tests/fail/SEC-18_char_eof.urus` and
+  `tests/fail/SEC-19_str_escape_eof.urus`.
+- Arena total-allocation cap — `URUS_MAX_ARENA_TOTAL` (512 MiB) bounds
+  the *sum* across chunks; the existing per-call cap couldn't stop many
+  small AST allocations from OOMing the process (libFuzzer rss-limit
+  hit).  Unwinds through `urus_abort_oom` like the other caps.
+- `urus_memcpy` — NULL-tolerant wrapper for the parser's grow-buffer
+  pattern (`memcpy(dst, NULL, 0)` is UB per the nonnull attribute and
+  UBSan flags it); 21 call sites routed through it.
+- Parser scratch buffers leak-proofed (LeakSanitizer finding) — the
+  `realloc`+`free` scratch leaked on early-return/break paths out of
+  collection loops and under the b026/b029 longjmp unwind.  All 19
+  scratch buffers now grow via `arena_grow`, so arena teardown frees
+  them on every path — the whole leak class is gone, not just the
+  reported instance.
+- `fuzz_compile.c` input cap 1 MiB → 64 KiB (codegen output is
+  super-linear in input size; large inputs bought RSS spikes, not
+  coverage).
+
 ### Status as of v0.0.1-b030
 
 **The pipeline is end-to-end verified for the first time.**  All 43

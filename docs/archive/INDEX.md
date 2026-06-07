@@ -17,6 +17,7 @@ For the format itself, see
 
 | Build                                  | Date       | Status | Highlights                                                                  |
 |----------------------------------------|------------|--------|-----------------------------------------------------------------------------|
+| [`v0.0.1-b031`](./v0.0.1-b031.md)      | 2026-06-07 | Alpha  | First CI run green (exec bits, ps1 exit code, fuzzer link flags) + first fuzzer findings fixed: lexer EOF overflow (SEC-18/19), arena 512 MiB total cap, NULL-tolerant `urus_memcpy` |
 | [`v0.0.1-b030`](./v0.0.1-b030.md)      | 2026-06-06 | Alpha  | First **end-to-end verified** build: 13 latent codegen/parser/runtime bugs fixed (value-producing `match`, F-TY-2 read side, `self` lowering, user enums, optional `;`, `_Generic` rewrite); 23/23 run-tests + 6/6 examples compile **and run** green |
 | [`v0.0.1-b029`](./v0.0.1-b029.md)      | 2026-06-04 | Alpha  | arena/strbuf OOM unwind via `urus_abort` hook — `urus_compile_buffer` now fully embedder-safe (no exit path left) |
 | [`v0.0.1-b028`](./v0.0.1-b028.md)      | 2026-06-04 | Alpha  | `defer` fires on every exit edge: early `return` (value-first ordering) + `?` propagation; per-fn defer stack |
@@ -77,4 +78,4 @@ B → S → M → R → D → A → L → U → C → F → P → O → X → T 
 4. Add one row at the top of the table above.
 5. Commit with subject `archive: vX.Y.Z-bNNN — <highlight>`.
 
-— *Last updated 2026-06-06.*
+— *Last updated 2026-06-07.*

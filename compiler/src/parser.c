@@ -159,7 +159,7 @@ static TypeExpr *parse_type_inner(Parser *p) {
         int n = 0, cap = 0;
         for (;;) {
             TypeExpr *t = parse_type(p);
-            if (n >= cap) { cap = cap ? cap * 2 : 4; buf = (TypeExpr **)realloc(buf, cap * sizeof(*buf)); }
+            if (n >= cap) { cap = cap ? cap * 2 : 4; buf = (TypeExpr **)arena_grow(p->arena, buf, n * sizeof(*buf), cap * sizeof(*buf)); }
             buf[n++] = t;
             if (!match(p, TOK_COMMA)) break;
             if (check(p, TOK_RPAREN)) break;
@@ -167,14 +167,14 @@ static TypeExpr *parse_type_inner(Parser *p) {
         expect(p, TOK_RPAREN, ")");
         if (n == 1) {
             TypeExpr *only = buf[0];
-            free(buf);
+            /* scratch is arena-backed now — dies with the arena */
             return only;
         }
         TypeExpr *t = ast_new_type(p->arena, TY_TUPLE, loc);
         t->tuple.elems = (TypeExpr **)arena_alloc(p->arena, n * sizeof(TypeExpr *));
         urus_memcpy(t->tuple.elems, buf, n * sizeof(TypeExpr *));
         t->tuple.n = n;
-        free(buf);
+        /* scratch is arena-backed now — dies with the arena */
         return t;
     }
     if (match(p, TOK_KW_SELF_TYPE)) {
@@ -192,7 +192,7 @@ static TypeExpr *parse_type_inner(Parser *p) {
             int n = 0, cap = 0;
             for (;;) {
                 TypeExpr *a = parse_type(p);
-                if (n >= cap) { cap = cap ? cap * 2 : 4; buf = (TypeExpr **)realloc(buf, cap * sizeof(*buf)); }
+                if (n >= cap) { cap = cap ? cap * 2 : 4; buf = (TypeExpr **)arena_grow(p->arena, buf, n * sizeof(*buf), cap * sizeof(*buf)); }
                 buf[n++] = a;
                 if (!match(p, TOK_COMMA)) break;
                 if (check(p, TOK_GT)) break;
@@ -201,7 +201,7 @@ static TypeExpr *parse_type_inner(Parser *p) {
             t->generic.args = (TypeExpr **)arena_alloc(p->arena, n * sizeof(TypeExpr *));
             urus_memcpy(t->generic.args, buf, n * sizeof(TypeExpr *));
             t->generic.n_args = n;
-            free(buf);
+            /* scratch is arena-backed now — dies with the arena */
             return t;
         }
         TypeExpr *t = ast_new_type(p->arena, TY_NAMED, loc);
@@ -248,7 +248,7 @@ static Pattern *parse_pattern_inner(Parser *p) {
             if (!check(p, TOK_RPAREN)) {
                 for (;;) {
                     Pattern *sub = parse_pattern(p);
-                    if (n >= cap) { cap = cap ? cap * 2 : 4; buf = (Pattern **)realloc(buf, cap * sizeof(*buf)); }
+                    if (n >= cap) { cap = cap ? cap * 2 : 4; buf = (Pattern **)arena_grow(p->arena, buf, n * sizeof(*buf), cap * sizeof(*buf)); }
                     buf[n++] = sub;
                     if (!match(p, TOK_COMMA)) break;
                     if (check(p, TOK_RPAREN)) break;
@@ -258,7 +258,7 @@ static Pattern *parse_pattern_inner(Parser *p) {
             pat->variant.subs = (Pattern **)arena_alloc(p->arena, n * sizeof(Pattern *));
             urus_memcpy(pat->variant.subs, buf, n * sizeof(Pattern *));
             pat->variant.n = n;
-            free(buf);
+            /* scratch is arena-backed now — dies with the arena */
             return pat;
         }
 
@@ -380,7 +380,7 @@ static Expr *parse_call_args(Parser *p, Expr *callee, SrcLoc loc) {
     if (!check(p, TOK_RPAREN)) {
         for (;;) {
             Expr *a = parse_expr(p);
-            if (n >= cap) { cap = cap ? cap * 2 : 4; args = (Expr **)realloc(args, cap * sizeof(*args)); }
+            if (n >= cap) { cap = cap ? cap * 2 : 4; args = (Expr **)arena_grow(p->arena, args, n * sizeof(*args), cap * sizeof(*args)); }
             args[n++] = a;
             if (!match(p, TOK_COMMA)) break;
             if (check(p, TOK_RPAREN)) break;
@@ -392,7 +392,7 @@ static Expr *parse_call_args(Parser *p, Expr *callee, SrcLoc loc) {
     e->call.args   = (Expr **)arena_alloc(p->arena, n * sizeof(Expr *));
     urus_memcpy(e->call.args, args, n * sizeof(Expr *));
     e->call.n_args = n;
-    free(args);
+    /* scratch is arena-backed now — dies with the arena */
     return e;
 }
 
@@ -417,7 +417,7 @@ static Expr *parse_struct_lit(Parser *p, const char *name, SrcLoc loc) {
                 value = ast_new_expr(p->arena, EX_IDENT, floc);
                 value->ident = fname;
             }
-            if (n >= cap) { cap = cap ? cap * 2 : 4; fields = (StructFieldInit *)realloc(fields, cap * sizeof(*fields)); }
+            if (n >= cap) { cap = cap ? cap * 2 : 4; fields = (StructFieldInit *)arena_grow(p->arena, fields, n * sizeof(*fields), cap * sizeof(*fields)); }
             fields[n].name  = fname;
             fields[n].value = value;
             n++;
@@ -431,7 +431,7 @@ static Expr *parse_struct_lit(Parser *p, const char *name, SrcLoc loc) {
     e->struct_lit.fields   = (StructFieldInit *)arena_alloc(p->arena, n * sizeof(StructFieldInit));
     urus_memcpy(e->struct_lit.fields, fields, n * sizeof(StructFieldInit));
     e->struct_lit.n_fields = n;
-    free(fields);
+    /* scratch is arena-backed now — dies with the arena */
     return e;
 }
 
@@ -573,7 +573,7 @@ static Expr *parse_primary(Parser *p) {
                 Pattern *pat = parse_pattern(p);
                 expect(p, TOK_FATARROW, "=>");
                 Expr *body = parse_expr(p);
-                if (n >= cap) { cap = cap ? cap * 2 : 4; arms = (MatchArm *)realloc(arms, cap * sizeof(*arms)); }
+                if (n >= cap) { cap = cap ? cap * 2 : 4; arms = (MatchArm *)arena_grow(p->arena, arms, n * sizeof(*arms), cap * sizeof(*arms)); }
                 arms[n].pat   = pat;
                 arms[n].guard = NULL;
                 arms[n].body  = body;
@@ -596,7 +596,7 @@ static Expr *parse_primary(Parser *p) {
             e->match_.arms   = (MatchArm *)arena_alloc(p->arena, n * sizeof(MatchArm));
             urus_memcpy(e->match_.arms, arms, n * sizeof(MatchArm));
             e->match_.n_arms = n;
-            free(arms);
+            /* scratch is arena-backed now — dies with the arena */
             return e;
         }
 
@@ -626,12 +626,12 @@ static Expr *parse_primary(Parser *p) {
             if (match(p, TOK_COMMA)) {
                 Expr **buf = NULL;
                 int n = 1, cap = 4;
-                buf = (Expr **)malloc(cap * sizeof(*buf));
+                buf = (Expr **)arena_alloc(p->arena, cap * sizeof(*buf));
                 buf[0] = first;
                 if (!check(p, TOK_RPAREN)) {
                     for (;;) {
                         Expr *x = parse_expr(p);
-                        if (n >= cap) { cap *= 2; buf = (Expr **)realloc(buf, cap * sizeof(*buf)); }
+                        if (n >= cap) { cap *= 2; buf = (Expr **)arena_grow(p->arena, buf, n * sizeof(*buf), cap * sizeof(*buf)); }
                         buf[n++] = x;
                         if (!match(p, TOK_COMMA)) break;
                         if (check(p, TOK_RPAREN)) break;
@@ -642,7 +642,7 @@ static Expr *parse_primary(Parser *p) {
                 e->tuple_lit.elems = (Expr **)arena_alloc(p->arena, n * sizeof(Expr *));
                 urus_memcpy(e->tuple_lit.elems, buf, n * sizeof(Expr *));
                 e->tuple_lit.n = n;
-                free(buf);
+                /* scratch is arena-backed now — dies with the arena */
                 return e;
             }
             expect(p, TOK_RPAREN, ")");
@@ -656,7 +656,7 @@ static Expr *parse_primary(Parser *p) {
             if (!check(p, TOK_RBRACKET)) {
                 for (;;) {
                     Expr *x = parse_expr(p);
-                    if (n >= cap) { cap = cap ? cap * 2 : 4; buf = (Expr **)realloc(buf, cap * sizeof(*buf)); }
+                    if (n >= cap) { cap = cap ? cap * 2 : 4; buf = (Expr **)arena_grow(p->arena, buf, n * sizeof(*buf), cap * sizeof(*buf)); }
                     buf[n++] = x;
                     if (!match(p, TOK_COMMA)) break;
                     if (check(p, TOK_RBRACKET)) break;
@@ -667,7 +667,7 @@ static Expr *parse_primary(Parser *p) {
             e->array_lit.elems = (Expr **)arena_alloc(p->arena, n * sizeof(Expr *));
             urus_memcpy(e->array_lit.elems, buf, n * sizeof(Expr *));
             e->array_lit.n = n;
-            free(buf);
+            /* scratch is arena-backed now — dies with the arena */
             return e;
         }
 
@@ -679,7 +679,7 @@ static Expr *parse_primary(Parser *p) {
             if (check(p, TOK_COLONCOLON)) {
                 const char **segs = NULL;
                 int n = 0, cap = 0;
-                if (n >= cap) { cap = 4; segs = (const char **)malloc(cap * sizeof(*segs)); }
+                if (n >= cap) { cap = 4; segs = (const char **)arena_alloc(p->arena, cap * sizeof(*segs)); }
                 segs[n++] = name;
                 while (match(p, TOK_COLONCOLON)) {
                     if (!check(p, TOK_IDENT)) {
@@ -688,14 +688,14 @@ static Expr *parse_primary(Parser *p) {
                     }
                     const char *s = arena_strndup(p->arena, p->cur.start, p->cur.length);
                     advance(p);
-                    if (n >= cap) { cap *= 2; segs = (const char **)realloc(segs, cap * sizeof(*segs)); }
+                    if (n >= cap) { cap *= 2; segs = (const char **)arena_grow(p->arena, segs, n * sizeof(*segs), cap * sizeof(*segs)); }
                     segs[n++] = s;
                 }
                 Expr *e = ast_new_expr(p->arena, EX_PATH, loc);
                 e->path.segs = (const char **)arena_alloc(p->arena, n * sizeof(char *));
                 urus_memcpy(e->path.segs, segs, n * sizeof(char *));
                 e->path.n = n;
-                free(segs);
+                /* scratch is arena-backed now — dies with the arena */
                 return e;
             }
 
@@ -827,7 +827,7 @@ static Expr *parse_precedence_inner(Parser *p, Precedence min_prec) {
                 if (!check(p, TOK_RPAREN)) {
                     for (;;) {
                         Expr *a = parse_expr(p);
-                        if (n >= cap) { cap = cap ? cap * 2 : 4; args = (Expr **)realloc(args, cap * sizeof(*args)); }
+                        if (n >= cap) { cap = cap ? cap * 2 : 4; args = (Expr **)arena_grow(p->arena, args, n * sizeof(*args), cap * sizeof(*args)); }
                         args[n++] = a;
                         if (!match(p, TOK_COMMA)) break;
                         if (check(p, TOK_RPAREN)) break;
@@ -840,7 +840,7 @@ static Expr *parse_precedence_inner(Parser *p, Precedence min_prec) {
                 e->method.args   = (Expr **)arena_alloc(p->arena, n * sizeof(Expr *));
                 urus_memcpy(e->method.args, args, n * sizeof(Expr *));
                 e->method.n_args = n;
-                free(args);
+                /* scratch is arena-backed now — dies with the arena */
                 lhs = e;
             } else {
                 Expr *e = ast_new_expr(p->arena, EX_FIELD, loc);
@@ -919,7 +919,7 @@ static Expr *parse_block_inner(Parser *p) {
             tail = s->expr_.expr;
             break;
         }
-        if (n >= cap) { cap = cap ? cap * 2 : 8; stmts = (Stmt **)realloc(stmts, cap * sizeof(*stmts)); }
+        if (n >= cap) { cap = cap ? cap * 2 : 8; stmts = (Stmt **)arena_grow(p->arena, stmts, n * sizeof(*stmts), cap * sizeof(*stmts)); }
         stmts[n++] = s;
     }
     expect(p, TOK_RBRACE, "}");
@@ -928,7 +928,7 @@ static Expr *parse_block_inner(Parser *p) {
     urus_memcpy(blk->block.stmts, stmts, n * sizeof(Stmt *));
     blk->block.n_stmts = n;
     blk->block.tail    = tail;
-    free(stmts);
+    /* scratch is arena-backed now — dies with the arena */
     return blk;
 }
 
@@ -1005,7 +1005,7 @@ static Item *parse_struct(Parser *p, bool is_pub) {
     int n = 0, cap = 0;
     while (!check(p, TOK_RBRACE) && !check(p, TOK_EOF)) {
         StructField f = parse_struct_field(p);
-        if (n >= cap) { cap = cap ? cap * 2 : 4; buf = (StructField *)realloc(buf, cap * sizeof(*buf)); }
+        if (n >= cap) { cap = cap ? cap * 2 : 4; buf = (StructField *)arena_grow(p->arena, buf, n * sizeof(*buf), cap * sizeof(*buf)); }
         buf[n++] = f;
         if (!match(p, TOK_COMMA)) break;
     }
@@ -1018,7 +1018,7 @@ static Item *parse_struct(Parser *p, bool is_pub) {
     sd->n_fields = n;
     sd->fields   = (StructField *)arena_alloc(p->arena, n * sizeof(StructField));
     urus_memcpy(sd->fields, buf, n * sizeof(StructField));
-    free(buf);
+    /* scratch is arena-backed now — dies with the arena */
     Item *it = ast_new_item(p->arena, IT_STRUCT);
     it->strct = sd;
     return it;
@@ -1046,7 +1046,7 @@ static Item *parse_enum(Parser *p, bool is_pub) {
                     StructField f = {0};
                     f.name = "_0";
                     f.type = parse_type(p);
-                    if (pn >= pcap) { pcap = pcap ? pcap * 2 : 4; pf = (StructField *)realloc(pf, pcap * sizeof(*pf)); }
+                    if (pn >= pcap) { pcap = pcap ? pcap * 2 : 4; pf = (StructField *)arena_grow(p->arena, pf, pn * sizeof(*pf), pcap * sizeof(*pf)); }
                     pf[pn++] = f;
                     if (!match(p, TOK_COMMA)) break;
                     if (check(p, TOK_RPAREN)) break;
@@ -1056,9 +1056,9 @@ static Item *parse_enum(Parser *p, bool is_pub) {
             v.payload   = (StructField *)arena_alloc(p->arena, pn * sizeof(StructField));
             urus_memcpy(v.payload, pf, pn * sizeof(StructField));
             v.n_payload = pn;
-            free(pf);
+            /* scratch is arena-backed now — dies with the arena */
         }
-        if (n >= cap) { cap = cap ? cap * 2 : 4; vars = (EnumVariant *)realloc(vars, cap * sizeof(*vars)); }
+        if (n >= cap) { cap = cap ? cap * 2 : 4; vars = (EnumVariant *)arena_grow(p->arena, vars, n * sizeof(*vars), cap * sizeof(*vars)); }
         vars[n++] = v;
         if (!match(p, TOK_COMMA)) break;
     }
@@ -1071,7 +1071,7 @@ static Item *parse_enum(Parser *p, bool is_pub) {
     ed->n_variants = n;
     ed->variants = (EnumVariant *)arena_alloc(p->arena, n * sizeof(EnumVariant));
     urus_memcpy(ed->variants, vars, n * sizeof(EnumVariant));
-    free(vars);
+    /* scratch is arena-backed now — dies with the arena */
     Item *it = ast_new_item(p->arena, IT_ENUM);
     it->enm = ed;
     return it;
@@ -1115,7 +1115,7 @@ static FnDecl *parse_fn(Parser *p, bool is_pub, const char *owner_type) {
                 fp.pat  = pat;
                 fp.type = ty;
             }
-            if (n >= cap) { cap = cap ? cap * 2 : 4; params = (FnParam *)realloc(params, cap * sizeof(*params)); }
+            if (n >= cap) { cap = cap ? cap * 2 : 4; params = (FnParam *)arena_grow(p->arena, params, n * sizeof(*params), cap * sizeof(*params)); }
             params[n++] = fp;
             if (!match(p, TOK_COMMA)) break;
             if (check(p, TOK_RPAREN)) break;
@@ -1139,7 +1139,7 @@ static FnDecl *parse_fn(Parser *p, bool is_pub, const char *owner_type) {
     f->is_method  = owner_type != NULL;
     f->owner_type = owner_type;
     f->loc        = loc;
-    free(params);
+    /* scratch is arena-backed now — dies with the arena */
     return f;
 }
 
@@ -1161,7 +1161,7 @@ static Item *parse_impl(Parser *p) {
             continue;
         }
         FnDecl *f = parse_fn(p, is_pub, tname);
-        if (n >= cap) { cap = cap ? cap * 2 : 4; methods = (FnDecl **)realloc(methods, cap * sizeof(*methods)); }
+        if (n >= cap) { cap = cap ? cap * 2 : 4; methods = (FnDecl **)arena_grow(p->arena, methods, n * sizeof(*methods), cap * sizeof(*methods)); }
         methods[n++] = f;
     }
     expect(p, TOK_RBRACE, "}");
@@ -1172,7 +1172,7 @@ static Item *parse_impl(Parser *p) {
     urus_memcpy(ib->methods, methods, n * sizeof(FnDecl *));
     ib->n_methods = n;
     ib->loc       = loc;
-    free(methods);
+    /* scratch is arena-backed now — dies with the arena */
 
     Item *it = ast_new_item(p->arena, IT_IMPL);
     it->impl = ib;
@@ -1188,7 +1188,7 @@ static Item *parse_use(Parser *p) {
         if (!check(p, TOK_IDENT)) { diag_error(p->diag, p->cur.loc, "expected identifier"); break; }
         const char *s = arena_strndup(p->arena, p->cur.start, p->cur.length);
         advance(p);
-        if (n >= cap) { cap = cap ? cap * 2 : 4; segs = (const char **)realloc(segs, cap * sizeof(*segs)); }
+        if (n >= cap) { cap = cap ? cap * 2 : 4; segs = (const char **)arena_grow(p->arena, segs, n * sizeof(*segs), cap * sizeof(*segs)); }
         segs[n++] = s;
         if (!match(p, TOK_COLONCOLON) && !match(p, TOK_DOT)) break;
     }
@@ -1199,7 +1199,7 @@ static Item *parse_use(Parser *p) {
     urus_memcpy(ud->segs, segs, n * sizeof(char *));
     ud->n_segs = n;
     ud->loc    = loc;
-    free(segs);
+    /* scratch is arena-backed now — dies with the arena */
     Item *it = ast_new_item(p->arena, IT_USE);
     it->use  = ud;
     return it;
@@ -1286,7 +1286,7 @@ Module *parser_parse_module(Parser *p) {
     while (!check(p, TOK_EOF)) {
         Item *it = parse_item(p);
         if (it) {
-            if (n >= cap) { cap = cap ? cap * 2 : 8; items = (Item **)realloc(items, cap * sizeof(*items)); }
+            if (n >= cap) { cap = cap ? cap * 2 : 8; items = (Item **)arena_grow(p->arena, items, n * sizeof(*items), cap * sizeof(*items)); }
             items[n++] = it;
         }
         if (p->panic_mode) sync_to_item(p);
@@ -1294,6 +1294,6 @@ Module *parser_parse_module(Parser *p) {
     m->items   = (Item **)arena_alloc(p->arena, n * sizeof(Item *));
     urus_memcpy(m->items, items, n * sizeof(Item *));
     m->n_items = n;
-    free(items);
+    /* scratch is arena-backed now — dies with the arena */
     return m;
 }
