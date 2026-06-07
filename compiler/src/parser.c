@@ -721,7 +721,24 @@ static Expr *parse_primary(Parser *p) {
     }
 }
 
+static Expr *parse_unary_inner(Parser *p);
+
+/* Guarded like parse_type/parse_pattern/parse_precedence: a bare
+ * `!!!!!…x` (or -----x, &&&&&x, *****x) chain recurses through
+ * parse_unary directly, bypassing parse_precedence's guard — without
+ * this wrapper the F-COMP-1 cap never trips (fuzzer finding:
+ * stack-overflow reached via codegen on the unbounded AST). */
 static Expr *parse_unary(Parser *p) {
+    SrcLoc loc = p->cur.loc;
+    if (!enter_recursion(p)) {
+        return ast_new_expr(p->arena, EX_INT_LIT, loc);
+    }
+    Expr *r = parse_unary_inner(p);
+    leave_recursion(p);
+    return r;
+}
+
+static Expr *parse_unary_inner(Parser *p) {
     SrcLoc loc = p->cur.loc;
     if (match(p, TOK_MINUS)) {
         Expr *e = ast_new_expr(p->arena, EX_UNARY, loc);
