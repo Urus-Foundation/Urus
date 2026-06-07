@@ -22,6 +22,12 @@ void *arena_alloc(Arena *a, size_t size);
 void *arena_alloc_zero(Arena *a, size_t size);
 char *arena_strdup(Arena *a, const char *s);
 char *arena_strndup(Arena *a, const char *s, size_t n);
+/* realloc-shaped growth for scratch buffers.  Allocates new_size from the
+ * arena and copies used_size bytes from old (old space stays dead until
+ * arena_free — acceptable for short-lived compile scratch).  Unlike
+ * malloc/realloc scratch, arena scratch is longjmp-safe: the b026/b029
+ * fatal/OOM unwind frees it with everything else. */
+void *arena_grow(Arena *a, void *old, size_t used_size, size_t new_size);
 void  arena_free(Arena *a);
 
 #endif

@@ -65,7 +65,7 @@ void sb_puts(StrBuf *sb, const char *s) {
 
 void sb_putn(StrBuf *sb, const char *s, size_t n) {
     sb_reserve(sb, n);
-    memcpy(sb->data + sb->len, s, n);
+    urus_memcpy(sb->data + sb->len, s, n);
     sb->len += n;
     sb->data[sb->len] = '\0';
 }

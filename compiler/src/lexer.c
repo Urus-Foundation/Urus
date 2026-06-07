@@ -279,6 +279,9 @@ static Token lex_string(Lexer *lx) {
         char c;
         if (peek0(lx) == '\\') {
             advance(lx);
+            if (peek0(lx) == '\0') break;  /* `\` at EOF — same guard as
+                                              lex_char; the unterminated-
+                                              literal diag fires below. */
             c = (char)unescape(lx, peek0(lx));
             advance(lx);
         } else {
@@ -323,7 +326,7 @@ static Token lex_string(Lexer *lx) {
 
     Token t = make_tok(lx, TOK_STR, start);
     char *stored = (char *)arena_alloc(lx->arena, len + 1);
-    memcpy(stored, buf, len);
+    urus_memcpy(stored, buf, len);
     stored[len] = '\0';
     free(buf);
     t.v.str_val.ptr = stored;
@@ -334,9 +337,26 @@ static Token lex_string(Lexer *lx) {
 static Token lex_char(Lexer *lx) {
     const char *start = lx->cur;
     advance(lx);   /* ' */
-    int value;
+    int value = 0;
+    /* Never advance past the NUL terminator: `'` (or `'\`) at EOF must
+     * diagnose, not walk off the end of the buffer (fuzzer finding,
+     * heap-buffer-overflow in peek0). */
+    if (peek0(lx) == '\0') {
+        SrcLoc l = loc_here(lx, start);
+        diag_error(lx->diag, l, "unterminated char literal");
+        Token t = make_tok(lx, TOK_CHAR, start);
+        t.v.char_val = 0;
+        return t;
+    }
     if (peek0(lx) == '\\') {
         advance(lx);
+        if (peek0(lx) == '\0') {
+            SrcLoc l = loc_here(lx, start);
+            diag_error(lx->diag, l, "unterminated char literal");
+            Token t = make_tok(lx, TOK_CHAR, start);
+            t.v.char_val = 0;
+            return t;
+        }
         value = unescape(lx, advance(lx));
     } else {
         value = (unsigned char)advance(lx);

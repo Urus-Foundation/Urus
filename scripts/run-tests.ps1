@@ -110,3 +110,7 @@ Write-Host ""
 $color = if ($fail -eq 0) { 'Green' } else { 'Red' }
 Write-Host "Result: $pass passed, $fail failed, $skip skipped" -ForegroundColor $color
 if ($fail -gt 0) { exit 1 }
+# Explicit success: the last native command above is a self-test that
+# *intentionally* exits non-zero, and CI shells (GitHub's pwsh wrapper)
+# propagate $LASTEXITCODE if the script doesn't exit explicitly.
+exit 0

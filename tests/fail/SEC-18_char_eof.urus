@@ -1,0 +1,5 @@
+// SEC-18 — fuzzer finding: a lone ' at EOF walked the lexer past the
+// end of the buffer (heap-buffer-overflow in peek0). Must diagnose
+// 'unterminated char literal', never read out of bounds.
+fn main() {
+    let c = '

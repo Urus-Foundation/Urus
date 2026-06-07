@@ -19,9 +19,11 @@
 #include "compile.h"
 
 int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-    /* Cap fuzz input at 1 MiB — bigger inputs only slow exec/s without
-     * adding coverage (the resource-cap paths are hit well below this). */
-    if (size > (1u << 20)) return 0;
+    /* Cap fuzz input at 64 KiB.  Every resource-cap path triggers well
+     * below this, and codegen output can be super-linear in input size
+     * (nested statement-expressions, defer flushing), so bigger inputs
+     * only buy slower exec/s and RSS spikes, not coverage. */
+    if (size > (64u << 10)) return 0;
     urus_compile_buffer((const char *)data, size, "fuzz", NULL);
     return 0;
 }
