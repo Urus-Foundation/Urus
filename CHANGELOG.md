@@ -374,6 +374,14 @@ caught two real bugs within minutes — exactly what the harness is for:
 - `fuzz_compile.c` input cap 1 MiB → 64 KiB (codegen output is
   super-linear in input size; large inputs bought RSS spikes, not
   coverage).
+- Unary-chain depth-cap bypass (stack overflow) — `parse_unary`
+  recurses into itself directly for prefix operators (`!`, `-`, `~`,
+  `&`, `*`) without passing through `parse_precedence`, so the
+  F-COMP-1 guard never saw the depth; a `!!!!…true` chain built an
+  unbounded AST and codegen's recursive `cg_expr` blew the C stack
+  (ASan DEADLYSIGNAL).  `parse_unary` now carries the same
+  `enter_recursion` guard as the other parse entries.  Regression:
+  `tests/fail/SEC-20_unary_bomb.urus`.
 
 ### Status as of v0.0.1-b030
 
