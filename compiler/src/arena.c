@@ -14,6 +14,15 @@
  */
 #define URUS_MAX_ARENA_ALLOC (256ull * 1024ull * 1024ull)
 
+/*
+ * Total-allocation cap across the whole arena (all chunks).  The per-call
+ * cap above bounds one allocation; this bounds the *sum*, so a fuzzer (or
+ * a malicious source file) cannot OOM the process through many small
+ * AST-node allocations.  512 MiB is ~150× the largest legitimate v0.0.1
+ * compilation we have measured.
+ */
+#define URUS_MAX_ARENA_TOTAL (512ull * 1024ull * 1024ull)
+
 struct ArenaChunk {
     ArenaChunk *next;
     size_t      used;
@@ -48,6 +57,9 @@ void *arena_alloc(Arena *a, size_t size) {
      */
     if (size > (size_t)URUS_MAX_ARENA_ALLOC) {
         urus_abort_oom("refusing arena_alloc — exceeds 256 MiB per-call cap");
+    }
+    if (a->total_allocated > (size_t)URUS_MAX_ARENA_TOTAL) {
+        urus_abort_oom("refusing arena_alloc — arena exceeds 512 MiB total cap");
     }
     /* 8-byte align */
     size = (size + 7u) & ~(size_t)7u;
