@@ -13,7 +13,7 @@ Bootstrapped in **C11**, transpiled to **portable C**, designed to grow into som
 
 ---
 
-[![Version](https://img.shields.io/badge/version-v0.0.1--b030-1d1f24?style=flat-square)](./docs/archive/INDEX.md)
+[![Version](https://img.shields.io/badge/version-v0.0.1--b031-1d1f24?style=flat-square)](./docs/archive/INDEX.md)
 [![CI](https://img.shields.io/badge/CI-gcc%20%7C%20clang%20%7C%20ASan%2FUBSan-blue?style=flat-square)](./.github/workflows/ci.yml)
 [![Status](https://img.shields.io/badge/status-pre--alpha-orange?style=flat-square)](#-status)
 [![License](https://img.shields.io/badge/license-Apache--2.0%20OR%20MIT-blue?style=flat-square)](./LICENSE)
@@ -159,6 +159,7 @@ first, native backends later) that make adoption faster.
 | End-to-end verified | ✅       | 23/23 run-tests + 6/6 examples compile **and run** green; 13 latent codegen bugs fixed (`v0.0.1-b030`). |
 | Value-producing `match` | ✅   | `let x = match …` / tail position works; user-enum tags compared correctly (`v0.0.1-b030`). |
 | Typed payload extraction | ✅  | `Ok("s")` round-trips — read side picks the matching union arm (`v0.0.1-b030`). |
+| Fuzz-hardened lexer/parser | ✅ | First real fuzz runs: EOF guards in char/string literals, unary depth-cap, arena total cap, leak-proof scratch (`v0.0.1-b031`, SEC-18..20). |
 | Borrow checker      | ❌       | Planned in v0.3.0.                                                 |
 | Generics            | ❌       | Parsed; **not monomorphised**. Built-ins only.                     |
 | Traits              | ❌       | Keyword reserved.                                                  |
@@ -578,7 +579,7 @@ becomes a community.
 
 *Rooted strong, wild in execution.*
 
-🦬 — *URUS, 2026-06-06 — v0.0.1-b030.*
+🦬 — *URUS, 2026-06-07 — v0.0.1-b031.*
 
 [**↑ back to top**](#urus)
 
