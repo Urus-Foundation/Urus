@@ -57,7 +57,7 @@ int urus_compile_buffer(const char *src, size_t len,
     /* The lexer expects a NUL-terminated buffer it can scan to '\0'. */
     char *source = (char *)malloc(len + 1);
     if (!source) return 1;
-    memcpy(source, src, len);
+    urus_memcpy(source, src, len);
     source[len] = '\0';
 
     DiagCtx diag;

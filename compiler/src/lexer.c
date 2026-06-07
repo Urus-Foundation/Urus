@@ -323,7 +323,7 @@ static Token lex_string(Lexer *lx) {
 
     Token t = make_tok(lx, TOK_STR, start);
     char *stored = (char *)arena_alloc(lx->arena, len + 1);
-    memcpy(stored, buf, len);
+    urus_memcpy(stored, buf, len);
     stored[len] = '\0';
     free(buf);
     t.v.str_val.ptr = stored;

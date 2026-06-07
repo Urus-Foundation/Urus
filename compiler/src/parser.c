@@ -172,7 +172,7 @@ static TypeExpr *parse_type_inner(Parser *p) {
         }
         TypeExpr *t = ast_new_type(p->arena, TY_TUPLE, loc);
         t->tuple.elems = (TypeExpr **)arena_alloc(p->arena, n * sizeof(TypeExpr *));
-        memcpy(t->tuple.elems, buf, n * sizeof(TypeExpr *));
+        urus_memcpy(t->tuple.elems, buf, n * sizeof(TypeExpr *));
         t->tuple.n = n;
         free(buf);
         return t;
@@ -199,7 +199,7 @@ static TypeExpr *parse_type_inner(Parser *p) {
             }
             expect(p, TOK_GT, ">");
             t->generic.args = (TypeExpr **)arena_alloc(p->arena, n * sizeof(TypeExpr *));
-            memcpy(t->generic.args, buf, n * sizeof(TypeExpr *));
+            urus_memcpy(t->generic.args, buf, n * sizeof(TypeExpr *));
             t->generic.n_args = n;
             free(buf);
             return t;
@@ -256,7 +256,7 @@ static Pattern *parse_pattern_inner(Parser *p) {
             }
             expect(p, TOK_RPAREN, ")");
             pat->variant.subs = (Pattern **)arena_alloc(p->arena, n * sizeof(Pattern *));
-            memcpy(pat->variant.subs, buf, n * sizeof(Pattern *));
+            urus_memcpy(pat->variant.subs, buf, n * sizeof(Pattern *));
             pat->variant.n = n;
             free(buf);
             return pat;
@@ -390,7 +390,7 @@ static Expr *parse_call_args(Parser *p, Expr *callee, SrcLoc loc) {
     Expr *e = ast_new_expr(p->arena, EX_CALL, loc);
     e->call.callee = callee;
     e->call.args   = (Expr **)arena_alloc(p->arena, n * sizeof(Expr *));
-    memcpy(e->call.args, args, n * sizeof(Expr *));
+    urus_memcpy(e->call.args, args, n * sizeof(Expr *));
     e->call.n_args = n;
     free(args);
     return e;
@@ -429,7 +429,7 @@ static Expr *parse_struct_lit(Parser *p, const char *name, SrcLoc loc) {
     Expr *e = ast_new_expr(p->arena, EX_STRUCT_LIT, loc);
     e->struct_lit.name     = name;
     e->struct_lit.fields   = (StructFieldInit *)arena_alloc(p->arena, n * sizeof(StructFieldInit));
-    memcpy(e->struct_lit.fields, fields, n * sizeof(StructFieldInit));
+    urus_memcpy(e->struct_lit.fields, fields, n * sizeof(StructFieldInit));
     e->struct_lit.n_fields = n;
     free(fields);
     return e;
@@ -594,7 +594,7 @@ static Expr *parse_primary(Parser *p) {
             Expr *e = ast_new_expr(p->arena, EX_MATCH, loc);
             e->match_.scrut  = scrut;
             e->match_.arms   = (MatchArm *)arena_alloc(p->arena, n * sizeof(MatchArm));
-            memcpy(e->match_.arms, arms, n * sizeof(MatchArm));
+            urus_memcpy(e->match_.arms, arms, n * sizeof(MatchArm));
             e->match_.n_arms = n;
             free(arms);
             return e;
@@ -640,7 +640,7 @@ static Expr *parse_primary(Parser *p) {
                 expect(p, TOK_RPAREN, ")");
                 Expr *e = ast_new_expr(p->arena, EX_TUPLE_LIT, loc);
                 e->tuple_lit.elems = (Expr **)arena_alloc(p->arena, n * sizeof(Expr *));
-                memcpy(e->tuple_lit.elems, buf, n * sizeof(Expr *));
+                urus_memcpy(e->tuple_lit.elems, buf, n * sizeof(Expr *));
                 e->tuple_lit.n = n;
                 free(buf);
                 return e;
@@ -665,7 +665,7 @@ static Expr *parse_primary(Parser *p) {
             expect(p, TOK_RBRACKET, "]");
             Expr *e = ast_new_expr(p->arena, EX_ARRAY_LIT, loc);
             e->array_lit.elems = (Expr **)arena_alloc(p->arena, n * sizeof(Expr *));
-            memcpy(e->array_lit.elems, buf, n * sizeof(Expr *));
+            urus_memcpy(e->array_lit.elems, buf, n * sizeof(Expr *));
             e->array_lit.n = n;
             free(buf);
             return e;
@@ -693,7 +693,7 @@ static Expr *parse_primary(Parser *p) {
                 }
                 Expr *e = ast_new_expr(p->arena, EX_PATH, loc);
                 e->path.segs = (const char **)arena_alloc(p->arena, n * sizeof(char *));
-                memcpy(e->path.segs, segs, n * sizeof(char *));
+                urus_memcpy(e->path.segs, segs, n * sizeof(char *));
                 e->path.n = n;
                 free(segs);
                 return e;
@@ -838,7 +838,7 @@ static Expr *parse_precedence_inner(Parser *p, Precedence min_prec) {
                 e->method.recv   = lhs;
                 e->method.name   = name;
                 e->method.args   = (Expr **)arena_alloc(p->arena, n * sizeof(Expr *));
-                memcpy(e->method.args, args, n * sizeof(Expr *));
+                urus_memcpy(e->method.args, args, n * sizeof(Expr *));
                 e->method.n_args = n;
                 free(args);
                 lhs = e;
@@ -925,7 +925,7 @@ static Expr *parse_block_inner(Parser *p) {
     expect(p, TOK_RBRACE, "}");
     Expr *blk = ast_new_expr(p->arena, EX_BLOCK, loc);
     blk->block.stmts   = (Stmt **)arena_alloc(p->arena, n * sizeof(Stmt *));
-    memcpy(blk->block.stmts, stmts, n * sizeof(Stmt *));
+    urus_memcpy(blk->block.stmts, stmts, n * sizeof(Stmt *));
     blk->block.n_stmts = n;
     blk->block.tail    = tail;
     free(stmts);
@@ -1017,7 +1017,7 @@ static Item *parse_struct(Parser *p, bool is_pub) {
     sd->loc      = loc;
     sd->n_fields = n;
     sd->fields   = (StructField *)arena_alloc(p->arena, n * sizeof(StructField));
-    memcpy(sd->fields, buf, n * sizeof(StructField));
+    urus_memcpy(sd->fields, buf, n * sizeof(StructField));
     free(buf);
     Item *it = ast_new_item(p->arena, IT_STRUCT);
     it->strct = sd;
@@ -1054,7 +1054,7 @@ static Item *parse_enum(Parser *p, bool is_pub) {
             }
             expect(p, TOK_RPAREN, ")");
             v.payload   = (StructField *)arena_alloc(p->arena, pn * sizeof(StructField));
-            memcpy(v.payload, pf, pn * sizeof(StructField));
+            urus_memcpy(v.payload, pf, pn * sizeof(StructField));
             v.n_payload = pn;
             free(pf);
         }
@@ -1070,7 +1070,7 @@ static Item *parse_enum(Parser *p, bool is_pub) {
     ed->loc = loc;
     ed->n_variants = n;
     ed->variants = (EnumVariant *)arena_alloc(p->arena, n * sizeof(EnumVariant));
-    memcpy(ed->variants, vars, n * sizeof(EnumVariant));
+    urus_memcpy(ed->variants, vars, n * sizeof(EnumVariant));
     free(vars);
     Item *it = ast_new_item(p->arena, IT_ENUM);
     it->enm = ed;
@@ -1131,7 +1131,7 @@ static FnDecl *parse_fn(Parser *p, bool is_pub, const char *owner_type) {
     FnDecl *f = (FnDecl *)arena_alloc_zero(p->arena, sizeof(FnDecl));
     f->name       = name;
     f->params     = (FnParam *)arena_alloc(p->arena, n * sizeof(FnParam));
-    memcpy(f->params, params, n * sizeof(FnParam));
+    urus_memcpy(f->params, params, n * sizeof(FnParam));
     f->n_params   = n;
     f->ret_type   = ret;
     f->body       = body;
@@ -1169,7 +1169,7 @@ static Item *parse_impl(Parser *p) {
     ImplBlock *ib = (ImplBlock *)arena_alloc_zero(p->arena, sizeof(ImplBlock));
     ib->type_name = tname;
     ib->methods   = (FnDecl **)arena_alloc(p->arena, n * sizeof(FnDecl *));
-    memcpy(ib->methods, methods, n * sizeof(FnDecl *));
+    urus_memcpy(ib->methods, methods, n * sizeof(FnDecl *));
     ib->n_methods = n;
     ib->loc       = loc;
     free(methods);
@@ -1196,7 +1196,7 @@ static Item *parse_use(Parser *p) {
 
     UseDecl *ud = (UseDecl *)arena_alloc_zero(p->arena, sizeof(UseDecl));
     ud->segs   = (const char **)arena_alloc(p->arena, n * sizeof(char *));
-    memcpy(ud->segs, segs, n * sizeof(char *));
+    urus_memcpy(ud->segs, segs, n * sizeof(char *));
     ud->n_segs = n;
     ud->loc    = loc;
     free(segs);
@@ -1292,7 +1292,7 @@ Module *parser_parse_module(Parser *p) {
         if (p->panic_mode) sync_to_item(p);
     }
     m->items   = (Item **)arena_alloc(p->arena, n * sizeof(Item *));
-    memcpy(m->items, items, n * sizeof(Item *));
+    urus_memcpy(m->items, items, n * sizeof(Item *));
     m->n_items = n;
     free(items);
     return m;
