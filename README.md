@@ -575,6 +575,18 @@ becomes a community.
 
 ---
 
+## 👥 Maintainers and Contributors
+
+### Contributors
+
+<table>
+  <tr>
+    <td align="center"><a href="https://github.com/MuhammadLutfiMuzakiiVY"><img src="https://github.com/MuhammadLutfiMuzakiiVY.png" width="80" /><br /><sub><b>MuhammadLutfiMuzakiiVY</b></sub></a></td>
+  </tr>
+</table>
+
+---
+
 <div align="center">
 
 *Rooted strong, wild in execution.*

@@ -156,7 +156,7 @@ closed without review.
    - Deep contributor guide: [`docs/documentation/09-CONTRIBUTING-DEEP.md`](./docs/documentation/09-CONTRIBUTING-DEEP.md)
 2. **Open an issue** for anything non-trivial (≥ ~20 LOC, or any
    user-visible behavior change). Discuss the plan first.
-3. **Fork → branch → PR** the usual way.
+3. **Fork → branch → PR** the usual way (or via GitHub CLI: `gh repo fork Urus-Foundation/Urus --clone`).
 4. **Run the test suite + sanitizers locally** before pushing.
 5. **Update the matching doc + CHANGELOG + archive entry** if your
    change ships in a build.
